@@ -11,6 +11,10 @@
   <style>
     html,body{height:100%}
     .dark-mode{background:#0b1220;color:#e6eef6}
+    .card{border:1px solid #ddd;border-radius:0.5rem;padding:1rem;box-shadow:0 1px 3px rgba(0,0,0,0.1)}
+    .dark-mode .card{background:#1f2937;border-color:#374151}
+    .card-header{font-weight:600;margin-bottom:0.75rem;display:flex;justify-content:space-between;align-items:center}
+    .collapsible-section{margin-bottom:1rem}
   </style>
 </head>
 <body class="bg-gray-50 text-gray-800" id="bodyRoot">
@@ -50,82 +54,123 @@
       </div>
 
       <div id="panel-edit" class="hidden">
-        <h2 class="font-semibold mb-2">차트 수정</h2>
-        <div class="grid grid-cols-2 gap-4">
-          <div class="p-3 border rounded bg-gray-50">
-            <h3 class="font-medium mb-2">축 설정</h3>
-            <label class="block">차트 제목</label>
-            <input id="titleInput" class="border p-1 rounded w-full mb-2" />
-            <label class="block">X축 제목</label>
-            <input id="xlabelInput" class="border p-1 rounded w-full mb-2" />
-            <label class="block">Y축 제목</label>
-            <input id="ylabelInput" class="border p-1 rounded w-full mb-2" />
-            <label class="block">X축 범위 (예: 0,100)</label>
-            <input id="xlimInput" class="border p-1 rounded w-full mb-2" placeholder="시작,끝" />
-            <label class="block">Y축 범위 (예: 0,100)</label>
-            <input id="ylimInput" class="border p-1 rounded w-full mb-2" placeholder="시작,끝" />
-            <label class="inline-flex items-center"><input id="xlog" type="checkbox" class="mr-2"/> X축 로그</label>
-            <label class="inline-flex items-center ml-4"><input id="yinvert" type="checkbox" class="mr-2"/> Y축 반전</label>
-          </div>
-
-          <div class="p-3 border rounded bg-gray-50">
-            <h3 class="font-medium mb-2">눈금선 / 범례</h3>
-            <label class="inline-flex items-center"><input id="gridToggle" type="checkbox" class="mr-2"/> 눈금선 표시</label>
-            <div class="mt-2">
-              <label class="block">눈금선 색</label>
-              <input id="gridColor" type="color" value="#999999" class="w-20 h-8" />
-            </div>
-            <div class="mt-2">
-              <label class="block">눈금선 투명도</label>
-              <input id="gridAlpha" type="range" min="0" max="1" step="0.1" value="0.5" />
-            </div>
-
-            <div class="mt-2">
-              <label>범례 위치</label>
-              <select id="legendPos" class="border p-1 rounded w-full">
-                <option value="top right">우상</option>
-                <option value="top left">좌상</option>
-                <option value="bottom left">좌하</option>
-                <option value="bottom right">우하</option>
-                <option value="outside">차트 외부</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="p-3 border rounded bg-gray-50 mt-3">
-            <h3 class="font-medium mb-2">오차막대</h3>
-            <label class="inline-flex items-center"><input id="ebEnabled" type="checkbox" class="mr-2"/> 표시</label>
-            <label class="block mt-2">오차량 유형</label>
-            <select id="ebMode" class="border p-1 rounded w-full">
-              <option value="fixed">고정값</option>
-              <option value="percent">백분율</option>
-              <option value="std">표준편차</option>
-            </select>
-            <label class="block mt-2">값 (고정 또는 %)</label>
-            <input id="ebAmount" class="border p-1 rounded w-full" />
-          </div>
-
-          <div class="p-3 border rounded bg-gray-50 mt-3">
-            <h3 class="font-medium mb-2">추세선</h3>
-            <label class="inline-flex items-center"><input id="trendEnabled" type="checkbox" class="mr-2"/> 표시</label>
-            <label class="block mt-2">유형</label>
-            <select id="trendType" class="border p-1 rounded w-full">
-              <option value="linear">선형</option>
-              <option value="poly">다항식</option>
-            </select>
-            <label class="block mt-2">다항식 차수 (poly일때)</label>
-            <input id="trendDegree" class="border p-1 rounded w-full" value="2" />
-            <label class="inline-flex items-center mt-2"><input id="trendShowEq" type="checkbox" class="mr-2"/> 식 표시</label>
-          </div>
-
-          <div id="seriesSettings" class="p-3 border rounded bg-gray-50 mt-3">
-            <h3 class="font-medium mb-2">데이터 계열 서식</h3>
-            <div id="seriesControls" class="space-y-2 text-sm"></div>
-          </div>
-        </div>
-
-        <div class="mt-4">
+        <h2 class="font-semibold mb-4 text-lg">차트 수정</h2>
+        <div class="mb-4 flex gap-2">
+          <button id="swapAxes" class="px-4 py-2 bg-orange-500 text-white rounded">X/Y축 전환</button>
           <button id="btnUpdate" class="px-4 py-2 bg-indigo-600 text-white rounded">설정 반영</button>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+          <!-- 축 설정 -->
+          <div class="card collapsible-section">
+            <div class="card-header">
+              <span>축 설정</span>
+              <input id="show-axis" type="checkbox" checked class="cursor-pointer"/>
+            </div>
+            <div id="axis-content">
+              <label class="block text-sm mb-2">차트 제목</label>
+              <input id="titleInput" class="border p-1 rounded w-full mb-2 text-sm" />
+              <label class="block text-sm mb-2">X축 제목</label>
+              <input id="xlabelInput" class="border p-1 rounded w-full mb-2 text-sm" />
+              <label class="block text-sm mb-2">Y축 제목</label>
+              <input id="ylabelInput" class="border p-1 rounded w-full mb-2 text-sm" />
+              <label class="block text-sm mb-2">X축 범위 (예: 0,100)</label>
+              <input id="xlimInput" class="border p-1 rounded w-full mb-2 text-sm" placeholder="시작,끝" />
+              <label class="block text-sm mb-2">Y축 범위 (예: 0,100)</label>
+              <input id="ylimInput" class="border p-1 rounded w-full mb-2 text-sm" placeholder="시작,끝" />
+              <label class="inline-flex items-center text-sm"><input id="xlog" type="checkbox" class="mr-2"/> X축 로그</label>
+              <label class="inline-flex items-center ml-4 text-sm"><input id="yinvert" type="checkbox" class="mr-2"/> Y축 반전</label>
+            </div>
+          </div>
+
+          <!-- 눈금선 / 범례 -->
+          <div class="card collapsible-section">
+            <div class="card-header">
+              <span>눈금선 / 범례</span>
+              <input id="show-grid" type="checkbox" checked class="cursor-pointer"/>
+            </div>
+            <div id="grid-content">
+              <label class="inline-flex items-center text-sm"><input id="gridToggle" type="checkbox" class="mr-2"/> 눈금선 표시</label>
+              <div class="mt-2">
+                <label class="block text-sm">눈금선 색</label>
+                <input id="gridColor" type="color" value="#999999" class="w-20 h-8" />
+              </div>
+              <div class="mt-2">
+                <label class="block text-sm">눈금선 투명도</label>
+                <input id="gridAlpha" type="range" min="0" max="1" step="0.1" value="0.5" />
+              </div>
+              <div class="mt-2">
+                <label class="block text-sm">범례 위치</label>
+                <select id="legendPos" class="border p-1 rounded w-full text-sm">
+                  <option value="top right">우상</option>
+                  <option value="top left">좌상</option>
+                  <option value="bottom left">좌하</option>
+                  <option value="bottom right">우하</option>
+                  <option value="outside">차트 외부</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- 오차막대 -->
+          <div class="card collapsible-section">
+            <div class="card-header">
+              <span>오차막대</span>
+              <input id="show-errorbars" type="checkbox" class="cursor-pointer"/>
+            </div>
+            <div id="errorbars-content">
+              <label class="inline-flex items-center text-sm"><input id="ebEnabled" type="checkbox" class="mr-2"/> 표시</label>
+              <label class="block text-sm mt-2">오차량 유형</label>
+              <select id="ebMode" class="border p-1 rounded w-full text-sm">
+                <option value="fixed">고정값</option>
+                <option value="percent">백분율</option>
+                <option value="std">표준편차</option>
+              </select>
+              <label class="block text-sm mt-2">값 (고정 또는 %)</label>
+              <input id="ebAmount" class="border p-1 rounded w-full text-sm" />
+            </div>
+          </div>
+
+          <!-- 추세선 -->
+          <div class="card collapsible-section">
+            <div class="card-header">
+              <span>추세선</span>
+              <input id="show-trendline" type="checkbox" class="cursor-pointer"/>
+            </div>
+            <div id="trendline-content">
+              <label class="inline-flex items-center text-sm"><input id="trendEnabled" type="checkbox" class="mr-2"/> 표시</label>
+              <label class="block text-sm mt-2">유형</label>
+              <select id="trendType" class="border p-1 rounded w-full text-sm">
+                <option value="linear">선형</option>
+                <option value="poly">다항식</option>
+              </select>
+              <label class="block text-sm mt-2">다항식 차수 (poly일때)</label>
+              <input id="trendDegree" class="border p-1 rounded w-full text-sm" value="2" />
+              <label class="inline-flex items-center text-sm mt-2"><input id="trendShowEq" type="checkbox" class="mr-2"/> 식 표시</label>
+            </div>
+          </div>
+
+          <!-- 데이터 레이블 -->
+          <div class="card collapsible-section">
+            <div class="card-header">
+              <span>데이터 레이블</span>
+              <input id="show-datalabels" type="checkbox" class="cursor-pointer"/>
+            </div>
+            <div id="datalabels-content">
+              <label class="inline-flex items-center text-sm"><input id="datalabelsEnabled" type="checkbox" class="mr-2"/> 표시</label>
+              <label class="block text-sm mt-2">소수자리</label>
+              <input id="datalabelsDecimals" type="number" value="0" min="0" max="5" class="border p-1 rounded w-full text-sm" />
+            </div>
+          </div>
+
+          <!-- 데이터 계열 서식 -->
+          <div class="card collapsible-section lg:col-span-2">
+            <div class="card-header">
+              <span>데이터 계열 서식</span>
+              <input id="show-series" type="checkbox" checked class="cursor-pointer"/>
+            </div>
+            <div id="seriesControls" class="space-y-3 text-sm"></div>
+          </div>
         </div>
       </div>
 

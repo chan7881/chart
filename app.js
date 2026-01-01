@@ -11,6 +11,11 @@ const panelUpload = document.getElementById('panel-upload');
 const panelEdit = document.getElementById('panel-edit');
 const darkToggle = document.getElementById('darkToggle');
 const downloadHiRes = document.getElementById('downloadHiRes');
+const swapAxes = document.getElementById('swapAxes');
+const btnUpdate = document.getElementById('btnUpdate');
+
+// state: track swapped columns
+let isSwapped = false;
 
 tabUpload.addEventListener('click', ()=>{panelUpload.classList.remove('hidden');panelEdit.classList.add('hidden');tabUpload.classList.add('bg-blue-500');tabEdit.classList.remove('bg-blue-500');});
 tabEdit.addEventListener('click', ()=>{panelUpload.classList.add('hidden');panelEdit.classList.remove('hidden');tabEdit.classList.add('bg-blue-500');tabUpload.classList.remove('bg-blue-500');});
@@ -239,26 +244,44 @@ function collectOptionsFromUI(){
   if (ylim.length===2) options.axis.ylim = [Number(ylim[0]), Number(ylim[1])];
   options.axis.xlog = document.getElementById('xlog').checked;
   options.axis.yinvert = document.getElementById('yinvert').checked;
-  options.grid = {enabled: document.getElementById('gridToggle').checked, color: document.getElementById('gridColor').value, alpha: Number(document.getElementById('gridAlpha').value), width:1};
+  
+  // grid - only if show-grid is checked
+  const showGrid = document.getElementById('show-grid').checked;
+  options.grid = showGrid ? {enabled: document.getElementById('gridToggle').checked, color: document.getElementById('gridColor').value, alpha: Number(document.getElementById('gridAlpha').value), width:1} : {enabled:false};
+  
+  // legend
   options.legend = {position: document.getElementById('legendPos').value};
-  options.errorbars = {enabled: document.getElementById('ebEnabled').checked, mode: document.getElementById('ebMode').value, amount: Number(document.getElementById('ebAmount').value||0)};
-  options.trendline = {enabled: document.getElementById('trendEnabled').checked, type: document.getElementById('trendType').value, degree: Number(document.getElementById('trendDegree').value||2), showEq: document.getElementById('trendShowEq').checked};
-  options.datalabels = {enabled:false};
+  
+  // errorbars - only if show-errorbars is checked
+  const showEb = document.getElementById('show-errorbars').checked;
+  options.errorbars = showEb ? {enabled: document.getElementById('ebEnabled').checked, mode: document.getElementById('ebMode').value, amount: Number(document.getElementById('ebAmount').value||0)} : {enabled:false};
+  
+  // trendline - only if show-trendline is checked
+  const showTrend = document.getElementById('show-trendline').checked;
+  options.trendline = showTrend ? {enabled: document.getElementById('trendEnabled').checked, type: document.getElementById('trendType').value, degree: Number(document.getElementById('trendDegree').value||2), showEq: document.getElementById('trendShowEq').checked} : {enabled:false};
+  
+  // datalabels - only if show-datalabels is checked
+  const showDl = document.getElementById('show-datalabels').checked;
+  options.datalabels = showDl ? {enabled: document.getElementById('datalabelsEnabled').checked, decimals: Number(document.getElementById('datalabelsDecimals').value||0)} : {enabled:false};
+  
   options.dual_axis = true;
-  // series
+  
+  // series - only if show-series is checked
   options.series = {};
-  const seriesControls = document.querySelectorAll('.series-control');
-  seriesControls.forEach(sc=>{
-    const name = sc.dataset.name;
-    const color = sc.querySelector('.series-color')?.value || '#1f77b4';
-    const linewidth = Number(sc.querySelector('.series-linewidth')?.value||1.5);
-    const marker = sc.querySelector('.series-marker')?.value || 'circle';
-    const markersize = Number(sc.querySelector('.series-markersize')?.value||6);
-    const alpha = Number(sc.querySelector('.series-alpha')?.value||1.0);
-    const show_line = sc.querySelector('.series-showline')?.checked || false;
-    const show_marker = sc.querySelector('.series-showmarker')?.checked || false;
-    options.series[name] = {color, linewidth, marker, markersize, alpha, show_line, show_marker};
-  });
+  if (document.getElementById('show-series').checked){
+    const seriesControls = document.querySelectorAll('.series-control');
+    seriesControls.forEach(sc=>{
+      const name = sc.dataset.name;
+      const color = sc.querySelector('.series-color')?.value || '#1f77b4';
+      const linewidth = Number(sc.querySelector('.series-linewidth')?.value||1.5);
+      const marker = sc.querySelector('.series-marker')?.value || 'circle';
+      const markersize = Number(sc.querySelector('.series-markersize')?.value||6);
+      const alpha = Number(sc.querySelector('.series-alpha')?.value||1.0);
+      const show_line = sc.querySelector('.series-showline')?.checked || false;
+      const show_marker = sc.querySelector('.series-showmarker')?.checked || false;
+      options.series[name] = {color, linewidth, marker, markersize, alpha, show_line, show_marker};
+    });
+  }
   return options;
 }
 
@@ -298,6 +321,38 @@ downloadHiRes.addEventListener('click', ()=>{
   const scale = prompt('배율 입력 (예: 2 = 2x 고해상도)', '2');
   const s = Math.max(1, Number(scale)||2);
   Plotly.downloadImage(gd, {format:'png', width:1600*s, height:900*s, scale: s});
+});
+
+// 설정 반영 버튼
+btnUpdate.addEventListener('click', ()=>{ btnPlot.click(); });
+
+// X/Y축 전환
+swapAxes.addEventListener('click', ()=>{
+  const xradio = document.querySelector('input[name="xfield"]:checked');
+  const ychecks = Array.from(document.querySelectorAll('input[name="yfield"]:checked'));
+  if (!xradio && ychecks.length === 0) return alert('축을 설정하세요');
+  if (ychecks.length > 1) return alert('Y축은 1개만 선택해주세요');
+  
+  // uncheck all
+  document.querySelectorAll('input[name="xfield"], input[name="yfield"]').forEach(i=>i.checked=false);
+  
+  // swap: current X -> Y, current Y -> X
+  if (xradio && ychecks.length===1){
+    const xval = xradio.value;
+    const yval = ychecks[0].value;
+    document.querySelector(`input[name="xfield"][value="${yval}"]`).checked=true;
+    document.querySelector(`input[name="yfield"][value="${xval}"]`).checked=true;
+  }
+  renderSeriesControls();
+});
+
+// collapsible toggle visibility
+document.querySelectorAll('[id^="show-"]').forEach(checkbox=>{
+  checkbox.addEventListener('change', (e)=>{
+    const sectionName = checkbox.id.replace('show-','');
+    const content = document.getElementById(sectionName+'-content');
+    if (content) content.style.display = checkbox.checked ? 'block' : 'none';
+  });
 });
 
 // initial attach
