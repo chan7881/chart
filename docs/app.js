@@ -9,7 +9,6 @@ const tabUpload = document.getElementById('tab-upload');
 const tabEdit = document.getElementById('tab-edit');
 const panelUpload = document.getElementById('panel-upload');
 const panelEdit = document.getElementById('panel-edit');
-const swapAxes = document.getElementById('swapAxes');
 const btnUpdate = document.getElementById('btnUpdatePreview');
 
 // state: track swapped columns
@@ -41,6 +40,41 @@ btnLoad.addEventListener('click', ()=>{
 });
 
 function renderColumns(cols){
+  // Populate axis dropdowns
+  const xAxisMainSel = document.getElementById('xAxisMain');
+  const xAxisSubSel = document.getElementById('xAxisSub');
+  const yAxisMainSel = document.getElementById('yAxisMain');
+  const yAxisSubSel = document.getElementById('yAxisSub');
+  
+  // Store current selections
+  const xMainVal = xAxisMainSel.value;
+  const xSubVal = xAxisSubSel.value;
+  const yMainVal = yAxisMainSel.value;
+  const ySubVal = yAxisSubSel.value;
+  
+  // Clear and rebuild dropdowns (keep first option "선택 안함")
+  [xAxisMainSel, xAxisSubSel, yAxisMainSel, yAxisSubSel].forEach(sel => {
+    while(sel.children.length > 1) sel.removeChild(sel.lastChild);
+  });
+  
+  cols.forEach(c => {
+    const opt1 = document.createElement('option'); opt1.value = c; opt1.textContent = c;
+    const opt2 = document.createElement('option'); opt2.value = c; opt2.textContent = c;
+    const opt3 = document.createElement('option'); opt3.value = c; opt3.textContent = c;
+    const opt4 = document.createElement('option'); opt4.value = c; opt4.textContent = c;
+    xAxisMainSel.appendChild(opt1);
+    xAxisSubSel.appendChild(opt2);
+    yAxisMainSel.appendChild(opt3);
+    yAxisSubSel.appendChild(opt4);
+  });
+  
+  // Restore previous selections if they still exist
+  if(cols.includes(xMainVal)) xAxisMainSel.value = xMainVal;
+  if(cols.includes(xSubVal)) xAxisSubSel.value = xSubVal;
+  if(cols.includes(yMainVal)) yAxisMainSel.value = yMainVal;
+  if(cols.includes(ySubVal)) yAxisSubSel.value = ySubVal;
+  
+  // Render checkboxes for displaying values
   columnsArea.innerHTML = '';
   const left = document.createElement('div');
   const right = document.createElement('div');
@@ -48,9 +82,10 @@ function renderColumns(cols){
     const el = document.createElement('div');
     el.className = 'p-2';
     el.innerHTML = `
-      <div class="font-medium">${c}</div>
-      <label class="text-sm">X<input type="checkbox" name="xfield" value="${c}" class="ml-2" /></label>
-      <label class="text-sm ml-2">Y<input type="checkbox" name="yfield" value="${c}" class="ml-2" /></label>
+      <label class="text-sm inline-flex items-center">
+        <input type="checkbox" name="displayField" value="${c}" class="mr-2" />
+        ${c}
+      </label>
     `;
     if (i % 2 === 0) left.appendChild(el); else right.appendChild(el);
   });
@@ -104,21 +139,35 @@ function polyval(coeffs, x){
 
 btnPlot.addEventListener('click', async ()=>{
   if (!workbookData) return alert('먼저 파일을 로드하세요');
-  const xchecks = Array.from(document.querySelectorAll('input[name="xfield"]:checked'));
-  const ychecks = Array.from(document.querySelectorAll('input[name="yfield"]:checked'));
-  const x_fields = xchecks.map(i=>i.value).slice(0,2);
-  const y_fields = ychecks.map(i=>i.value);
-  selectedYFields = y_fields; // store for label UI
+  
+  // Get axis selections from dropdowns
+  const xAxisMain = document.getElementById('xAxisMain').value;
+  const xAxisSub = document.getElementById('xAxisSub').value;
+  const yAxisMain = document.getElementById('yAxisMain').value;
+  const yAxisSub = document.getElementById('yAxisSub').value;
+  
+  // Get values to display from checkboxes
+  const displayChecks = Array.from(document.querySelectorAll('input[name="displayField"]:checked'));
+  const displayFields = displayChecks.map(i => i.value);
+  
+  if (!xAxisMain && !xAxisSub) return alert('X축을 최소 1개 선택하세요');
+  if (!yAxisMain && !yAxisSub) return alert('Y축을 최소 1개 선택하세요');
+  if (displayFields.length === 0) return alert('표시할 값을 최소 1개 선택하세요');
+  
+  // Use main axes for grouping/pivot
+  const x_fields = [xAxisMain, xAxisSub].filter(x => x);
+  const y_fields = [yAxisMain, yAxisSub].filter(y => y);
+  selectedYFields = displayFields; // store for label UI
   const chartType = document.getElementById('chartType').value;
 
-  // pivot/groupby
+  // pivot/groupby using main axes
   let plot_df = workbookData;
   if (x_fields.length && y_fields.length){
     plot_df = pivotAndAggregate(workbookData, x_fields, y_fields);
   }
 
   // Update Y-axis and X-axis label UI
-  updateYAxisLabelUI(y_fields);
+  updateYAxisLabelUI(displayFields);
   updateXAxisLabelUI(x_fields);
 
   // build traces
@@ -126,7 +175,7 @@ btnPlot.addEventListener('click', async ()=>{
   const layout = {
     title: {text: document.getElementById('titleInput').value || '', font:{size:14, family:'Arial, sans-serif', color:'#000'}},
     xaxis:{title: {text: document.getElementById('xlabel_0')?.value || (x_fields[0]||''), font:{size:12, color:'#000'}}, showgrid:false, zeroline:false, showline:true, linewidth:1.5, linecolor:'#000', mirror:true},
-    yaxis:{title: {text: document.getElementById('ylabel_0')?.value || document.getElementById('ylabelInput').value || (y_fields[0]||''), font:{size:12, color:'#000'}}, showgrid:false, zeroline:false, showline:true, linewidth:1.5, linecolor:'#000', mirror:true},
+    yaxis:{title: {text: document.getElementById('ylabel_0')?.value || document.getElementById('ylabelInput').value || (displayFields[0]||''), font:{size:12, color:'#000'}}, showgrid:false, zeroline:false, showline:true, linewidth:1.5, linecolor:'#000', mirror:true},
     template:'plotly_white',
     font:{family:'Arial, sans-serif', size:11, color:'#000'},
     margin:{l:60, r:40, t:50, b:50},
@@ -137,7 +186,8 @@ btnPlot.addEventListener('click', async ()=>{
 
   const xvals = x_fields.length ? plot_df.map(r=>r[x_fields[0]]) : plot_df.map((r,i)=>i);
 
-  y_fields.forEach((ycol, idx)=>{
+  // Only plot selected display fields
+  displayFields.forEach((ycol, idx)=>{
     const yvals = plot_df.map(r=>Number(r[ycol]));
     const color = options.series[ycol]?.color || '#000000'; // Default to black
     const trace = {
@@ -153,7 +203,7 @@ btnPlot.addEventListener('click', async ()=>{
     // dual axis: second series assign to yaxis: 'y2'
     if (idx===1 && options.dual_axis){
       trace.yaxis = 'y2';
-      const y2label = document.getElementById('ylabel_1')?.value || y_fields[1] || '';
+      const y2label = document.getElementById('ylabel_1')?.value || displayFields[1] || '';
       layout.yaxis2 = {overlaying: 'y', side: 'right', title: {text: y2label, font:{size:12, color:'#000'}}, showgrid:false, zeroline:false, showline:true, linewidth:1.5, linecolor:'#000', mirror:true};
     }
 
@@ -230,8 +280,8 @@ btnPlot.addEventListener('click', async ()=>{
   if (options.axis.yinvert){ layout.yaxis.autorange='reversed'; }
 
   // X axis 2 title (if second X selected)
-  if (xchecks.length>1){
-    const x2label = document.getElementById('xlabel_1')?.value || xchecks[1].value || '';
+  if (xAxisSub){
+    const x2label = document.getElementById('xlabel_1')?.value || xAxisSub || '';
     layout.xaxis2 = {overlaying: 'x', side: 'top', title: {text: x2label, font:{size:12, color:'#000'}}, showgrid:false, zeroline:false, showline:true, linewidth:1.5, linecolor:'#000', mirror:true};
   }
 
@@ -326,14 +376,14 @@ function collectOptionsFromUI(){
 function attachSeriesSettingsListeners(){
   const container = document.getElementById('seriesControls');
   container.innerHTML = '';
-  const ychecks = Array.from(document.querySelectorAll('input[name="yfield"]'));
-  ychecks.forEach(cb=>{ cb.addEventListener('change', ()=>renderSeriesControls()); });
+  const displayChecks = Array.from(document.querySelectorAll('input[name="displayField"]'));
+  displayChecks.forEach(cb=>{ cb.addEventListener('change', ()=>renderSeriesControls()); });
   renderSeriesControls();
 }
 function renderSeriesControls(){
   const container = document.getElementById('seriesControls'); container.innerHTML = '';
-  const ychecks = Array.from(document.querySelectorAll('input[name="yfield"]:checked'));
-  ychecks.forEach(cb=>{
+  const displayChecks = Array.from(document.querySelectorAll('input[name="displayField"]:checked'));
+  displayChecks.forEach(cb=>{
     const name = cb.value;
     const div = document.createElement('div');
     div.className = 'series-control p-2 border rounded'; div.dataset.name = name;
@@ -382,26 +432,6 @@ function updateXAxisLabelUI(x_fields){
 
 // 설정 반영 버튼
 btnUpdate.addEventListener('click', ()=>{ btnPlot.click(); });
-
-// X/Y축 전환
-swapAxes.addEventListener('click', ()=>{
-  const xchecks = Array.from(document.querySelectorAll('input[name="xfield"]:checked'));
-  const ychecks = Array.from(document.querySelectorAll('input[name="yfield"]:checked'));
-  if (xchecks.length===0 && ychecks.length===0) return alert('축을 설정하세요');
-  if (xchecks.length !== 1 || ychecks.length !== 1) return alert('X와 Y는 각각 1개씩 선택해야 전환할 수 있습니다');
-
-  // uncheck all
-  document.querySelectorAll('input[name="xfield"], input[name="yfield"]').forEach(i=>i.checked=false);
-
-  // swap: current X -> Y, current Y -> X
-  const xval = xchecks[0].value;
-  const yval = ychecks[0].value;
-  const targetX = document.querySelector(`input[name="xfield"][value="${yval}"]`);
-  const targetY = document.querySelector(`input[name="yfield"][value="${xval}"]`);
-  if (targetX) targetX.checked = true;
-  if (targetY) targetY.checked = true;
-  renderSeriesControls();
-});
 
 // collapsible toggle visibility
 document.querySelectorAll('[id^="show-"]').forEach(checkbox=>{
