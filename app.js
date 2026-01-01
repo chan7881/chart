@@ -1,90 +1,205 @@
-let workbookData = [];
+// app.js: 기존 기능을 모두 포함하되 데이터 매칭 버그를 수정한 버전
+
+const fileInput = document.getElementById('fileInput');
+const btnLoad = document.getElementById('btnLoad');
+const columnsArea = document.getElementById('columnsArea');
+const btnPlot = document.getElementById('btnPlot');
+const previewArea = document.getElementById('previewArea');
+const tabUpload = document.getElementById('tab-upload');
+const tabEdit = document.getElementById('tab-edit');
+const panelUpload = document.getElementById('panel-upload');
+const panelEdit = document.getElementById('panel-edit');
+const btnUpdate = document.getElementById('btnUpdatePreview');
+
+let workbookData = null; 
 let columns = [];
 
-// 파일 로드 및 데이터 파싱
-document.getElementById('btnLoad').addEventListener('click', () => {
-  const file = document.getElementById('fileInput').files[0];
-  if (!file) return alert('파일을 선택해주세요.');
+// 탭 전환
+tabUpload.addEventListener('click', ()=>{
+  panelUpload.classList.remove('hidden'); panelEdit.classList.add('hidden');
+  tabUpload.classList.add('bg-blue-500', 'text-white'); tabEdit.classList.remove('bg-blue-500', 'text-white');
+});
+tabEdit.addEventListener('click', ()=>{
+  panelUpload.classList.add('hidden'); panelEdit.classList.remove('hidden');
+  tabEdit.classList.add('bg-blue-500', 'text-white'); tabUpload.classList.remove('bg-blue-500', 'text-white');
+});
 
+// 파일 로드
+btnLoad.addEventListener('click', () => {
+  if (!fileInput.files.length) return alert('엑셀 파일을 선택하세요');
+  const f = fileInput.files[0];
   const reader = new FileReader();
   reader.onload = (e) => {
     const data = new Uint8Array(e.target.result);
     const wb = XLSX.read(data, { type: 'array' });
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    // 데이터 추출 시 null 값 보존 및 정확한 행 단위 파싱
+    const first = wb.SheetNames[0];
+    const ws = wb.Sheets[first];
     workbookData = XLSX.utils.sheet_to_json(ws, { defval: null });
     
-    if (workbookData.length > 0) {
-      columns = Object.keys(workbookData[0]);
-      populateSelectors();
-      renderCheckboxes();
-      alert('데이터 로드 성공!');
-    }
+    if (workbookData.length === 0) return alert('데이터가 없습니다.');
+    
+    columns = Object.keys(workbookData[0]);
+    renderColumns(columns);
+    alert(`로드 완료: ${workbookData.length}행`);
   };
-  reader.readAsArrayBuffer(file);
+  reader.readAsArrayBuffer(f);
 });
 
-function populateSelectors() {
-  const xSel = document.getElementById('xAxisMain');
-  const ySel = document.getElementById('yAxisMain');
-  xSel.innerHTML = '<option value="">X축 선택</option>';
-  ySel.innerHTML = '<option value="">Y축(주) 선택</option>';
+function renderColumns(cols) {
+  const selects = ['xAxisMain', 'xAxisSub', 'yAxisMain', 'yAxisSub'].map(id => document.getElementById(id));
+  selects.forEach(sel => {
+    sel.innerHTML = '<option value="">선택 안함</option>';
+    cols.forEach(c => sel.add(new Option(c, c)));
+  });
+
+  columnsArea.innerHTML = '';
+  cols.forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'flex items-center gap-2 p-1';
+    div.innerHTML = `<input type="checkbox" name="displayField" value="${c}" id="chk_${c}" />
+                     <label for="chk_${c}" class="text-sm truncate cursor-pointer">${c}</label>`;
+    columnsArea.appendChild(div);
+  });
   
-  columns.forEach(col => {
-    xSel.add(new Option(col, col));
-    ySel.add(new Option(col, col));
+  document.querySelectorAll('input[name="displayField"]').forEach(cb => {
+    cb.addEventListener('change', renderSeriesControls);
   });
 }
 
-function renderCheckboxes() {
-  const area = document.getElementById('columnsArea');
-  area.innerHTML = '';
-  columns.forEach(col => {
-    const label = document.createElement('label');
-    label.className = 'flex items-center gap-2 text-sm';
-    label.innerHTML = `<input type="checkbox" name="yFields" value="${col}"> ${col}`;
-    area.appendChild(label);
-  });
-}
+// [핵심] 차트 생성 로직
+btnPlot.addEventListener('click', () => {
+  if (!workbookData) return alert('데이터가 없습니다.');
 
-// 차트 생성 버튼 클릭 시 호출
-document.getElementById('btnPlot').addEventListener('click', () => {
-  const xCol = document.getElementById('xAxisMain').value;
-  const selectedY = Array.from(document.querySelectorAll('input[name="yFields"]:checked')).map(cb => cb.value);
+  const xAxisMain = document.getElementById('xAxisMain').value;
+  const xAxisSub = document.getElementById('xAxisSub').value;
+  const yAxisSub = document.getElementById('yAxisSub').value;
+  const displayFields = Array.from(document.querySelectorAll('input[name="displayField"]:checked')).map(i => i.value);
 
-  if (!xCol || selectedY.length === 0) return alert('X축과 최소 하나 이상의 데이터를 선택하세요.');
+  if (!xAxisMain && !xAxisSub) return alert('X축을 선택하세요.');
+  if (displayFields.length === 0) return alert('Y축 데이터를 선택하세요.');
 
-  const traces = selectedY.map(yCol => {
-    // [핵심 수정]: X와 Y 데이터를 행(row) 단위로 묶어서 추출
-    let pairedData = workbookData
-      .map(row => ({
-        x: row[xCol],
-        y: row[yCol]
-      }))
-      // 유효하지 않은 데이터(null, undefined) 필터링
-      .filter(item => item.x !== null && item.y !== null);
+  const options = collectOptionsFromUI();
+  updateAxisLabelUI([xAxisMain, xAxisSub].filter(Boolean), displayFields);
 
-    // [핵심 수정]: X축 값 기준으로 정렬 (숫자형인 경우 필수)
-    if (!isNaN(pairedData[0]?.x)) {
-      pairedData.sort((a, b) => Number(a.x) - Number(b.x));
+  const traces = [];
+  const layout = {
+    title: document.getElementById('titleInput').value || '',
+    xaxis: { title: document.getElementById('xlabel_0')?.value || xAxisMain, automargin: true },
+    yaxis: { title: document.getElementById('ylabel_0')?.value || displayFields[0], automargin: true },
+    template: 'plotly_white',
+    showlegend: document.getElementById('legendShow').checked,
+    grid: { rows: 1, columns: 1, pattern: 'independent' }
+  };
+
+  displayFields.forEach((ycol, idx) => {
+    const currentX = (idx > 0 && xAxisSub) ? xAxisSub : xAxisMain;
+    
+    // 데이터 매칭 수정: Row 단위로 x, y를 직접 매핑
+    let mapped = workbookData.map(row => ({
+      x: row[currentX],
+      y: row[ycol]
+    })).filter(d => d.x !== null && d.y !== null);
+
+    // X축 기준 정렬 (데이터 매칭 꼬임 방지 핵심)
+    if (mapped.length > 0 && !isNaN(mapped[0].x)) {
+      mapped.sort((a, b) => Number(a.x) - Number(b.x));
     }
 
-    return {
-      x: pairedData.map(d => d.x),
-      y: pairedData.map(d => Number(d.y)),
-      name: yCol,
-      mode: 'lines+markers',
-      type: 'scatter'
+    const seriesOpt = options.series[ycol] || { color: '#1f77b4', linewidth: 2, markersize: 6, show_line: true, show_marker: true };
+    
+    const trace = {
+      x: mapped.map(d => d.x),
+      y: mapped.map(d => Number(d.y)),
+      name: ycol,
+      mode: (seriesOpt.show_line ? 'lines' : '') + (seriesOpt.show_marker ? '+markers' : ''),
+      line: { color: seriesOpt.color, width: seriesOpt.linewidth, dash: seriesOpt.linestyle },
+      marker: { color: seriesOpt.color, size: seriesOpt.markersize, symbol: seriesOpt.marker },
+      type: document.getElementById('chartType').value
+    };
+
+    // 보조 Y축 설정
+    if (yAxisSub && ycol === yAxisSub) {
+      trace.yaxis = 'y2';
+      layout.yaxis2 = { title: yAxisSub, overlaying: 'y', side: 'right', automargin: true };
+    }
+
+    traces.push(trace);
+  });
+
+  // 기타 레이아웃 옵션 적용
+  if (options.axis.xlog) layout.xaxis.type = 'log';
+  if (options.axis.yinvert) layout.yaxis.autorange = 'reversed';
+  if (options.grid.enabled) {
+    layout.xaxis.showgrid = true; layout.xaxis.gridcolor = options.grid.color;
+    layout.yaxis.showgrid = true; layout.yaxis.gridcolor = options.grid.color;
+  }
+
+  const width = document.getElementById('chartWidth').value;
+  const height = document.getElementById('chartHeight').value || 500;
+  if (width) layout.width = width;
+  layout.height = height;
+
+  Plotly.newPlot('previewArea', traces, layout, { responsive: true });
+});
+
+// UI 설정 수집용 함수
+function collectOptionsFromUI() {
+  const series = {};
+  document.querySelectorAll('.series-control').forEach(sc => {
+    const n = sc.dataset.name;
+    series[n] = {
+      color: sc.querySelector('.series-color').value,
+      linewidth: Number(sc.querySelector('.series-linewidth').value),
+      markersize: Number(sc.querySelector('.series-markersize').value),
+      marker: sc.querySelector('.series-marker').value,
+      linestyle: sc.querySelector('.series-linestyle').value,
+      show_line: sc.querySelector('.series-showline').checked,
+      show_marker: sc.querySelector('.series-showmarker').checked
     };
   });
-
-  const layout = {
-    title: '데이터 분석 차트',
-    xaxis: { title: xCol, automargin: true },
-    yaxis: { title: 'Value', automargin: true },
-    hovermode: 'closest',
-    template: 'plotly_white'
+  return {
+    axis: { xlog: document.getElementById('xlog').checked, yinvert: document.getElementById('yinvert').checked },
+    grid: { enabled: document.getElementById('gridToggle').checked, color: document.getElementById('gridColor').value },
+    series: series
   };
+}
 
-  Plotly.newPlot('previewArea', traces, layout);
-});
+function renderSeriesControls() {
+  const container = document.getElementById('seriesControls');
+  const checked = Array.from(document.querySelectorAll('input[name="displayField"]:checked'));
+  container.innerHTML = '';
+  checked.forEach((cb, i) => {
+    const name = cb.value;
+    const div = document.createElement('div');
+    div.className = 'series-control p-2 border rounded bg-white';
+    div.dataset.name = name;
+    div.innerHTML = `
+      <div class="font-bold text-xs mb-1 border-b">${name}</div>
+      <div class="grid grid-cols-2 gap-1 text-[10px]">
+        <label>색상 <input type="color" class="series-color w-full h-4" value="${['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'][i % 4]}" /></label>
+        <label>마커 <select class="series-marker w-full border"><option value="circle">●</option><option value="square">■</option></select></label>
+        <label>두께 <input type="number" class="series-linewidth w-full border" value="2" /></label>
+        <label>크기 <input type="number" class="series-markersize w-full border" value="6" /></label>
+        <label class="col-span-2">스타일 <select class="series-linestyle w-full border"><option value="solid">실선</option><option value="dash">파선</option></select></label>
+        <div class="flex gap-2 mt-1">
+          <label><input type="checkbox" class="series-showline" checked /> 선</label>
+          <label><input type="checkbox" class="series-showmarker" checked /> 표식</label>
+        </div>
+      </div>`;
+    container.appendChild(div);
+  });
+}
+
+function updateAxisLabelUI(x_fields, y_fields) {
+  const xCon = document.getElementById('xlabels-container');
+  const yCon = document.getElementById('ylabels-container');
+  xCon.innerHTML = ''; yCon.innerHTML = '';
+  x_fields.forEach((f, i) => {
+    xCon.innerHTML += `<label class="block text-xs mt-1">X축 ${i+1} (${f})</label><input id="xlabel_${i}" class="border p-1 rounded w-full text-sm" value="${f}" />`;
+  });
+  y_fields.forEach((f, i) => {
+    yCon.innerHTML += `<label class="block text-xs mt-1">Y축 ${i+1} (${f})</label><input id="ylabel_${i}" class="border p-1 rounded w-full text-sm" value="${f}" />`;
+  });
+}
+
+btnUpdate.addEventListener('click', () => btnPlot.click());
