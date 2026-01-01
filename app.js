@@ -154,21 +154,27 @@ btnPlot.addEventListener('click', async ()=>{
   if (!yAxisMain && !yAxisSub) return alert('Y축을 최소 1개 선택하세요');
   if (displayFields.length === 0) return alert('표시할 값을 최소 1개 선택하세요');
   
-  // Use main axes for grouping/pivot
-  const x_fields = [xAxisMain, xAxisSub].filter(x => x);
-  const y_fields = [yAxisMain, yAxisSub].filter(y => y);
+  // Use main axes for grouping/pivot (only main axes used for aggregation)
+  const x_fields = xAxisMain ? [xAxisMain] : [];
+  const y_fields = yAxisMain ? [yAxisMain] : [];
   selectedYFields = displayFields; // store for label UI
   const chartType = document.getElementById('chartType').value;
 
-  // pivot/groupby using main axes
+  // pivot/groupby using main axes only
   let plot_df = workbookData;
   if (x_fields.length && y_fields.length){
     plot_df = pivotAndAggregate(workbookData, x_fields, y_fields);
   }
 
-  // Update Y-axis and X-axis label UI
-  updateYAxisLabelUI(displayFields);
-  updateXAxisLabelUI(x_fields);
+  // Update Y-axis and X-axis label UI based on actual axis selections
+  const axis_labels = [];
+  if (yAxisMain) axis_labels.push(yAxisMain);
+  if (yAxisSub) axis_labels.push(yAxisSub);
+  updateYAxisLabelUI(axis_labels);
+  const x_axis_labels = [];
+  if (xAxisMain) x_axis_labels.push(xAxisMain);
+  if (xAxisSub) x_axis_labels.push(xAxisSub);
+  updateXAxisLabelUI(x_axis_labels);
 
   // build traces
   const traces = [];
@@ -200,11 +206,9 @@ btnPlot.addEventListener('click', async ()=>{
     };
     // errorbars removed
 
-    // dual axis: second series assign to yaxis: 'y2'
-    if (idx===1 && options.dual_axis){
+    // dual axis: if there are 2 Y axes and this is the second trace, assign to yaxis: 'y2'
+    if (idx===1 && yAxisSub && options.dual_axis){
       trace.yaxis = 'y2';
-      const y2label = document.getElementById('ylabel_1')?.value || displayFields[1] || '';
-      layout.yaxis2 = {overlaying: 'y', side: 'right', title: {text: y2label, font:{size:12, color:'#000'}}, showgrid:false, zeroline:false, showline:true, linewidth:1.5, linecolor:'#000', mirror:true};
     }
 
     traces.push(trace);
@@ -283,6 +287,12 @@ btnPlot.addEventListener('click', async ()=>{
   if (xAxisSub){
     const x2label = document.getElementById('xlabel_1')?.value || xAxisSub || '';
     layout.xaxis2 = {overlaying: 'x', side: 'top', title: {text: x2label, font:{size:12, color:'#000'}}, showgrid:false, zeroline:false, showline:true, linewidth:1.5, linecolor:'#000', mirror:true};
+  }
+
+  // Y axis 2 title (if second Y selected)
+  if (yAxisSub){
+    const y2label = document.getElementById('ylabel_1')?.value || yAxisSub || '';
+    layout.yaxis2 = {overlaying: 'y', side: 'right', title: {text: y2label, font:{size:12, color:'#000'}}, showgrid:false, zeroline:false, showline:true, linewidth:1.5, linecolor:'#000', mirror:true};
   }
 
   // render
