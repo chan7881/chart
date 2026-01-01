@@ -7,7 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="style.css">
 </head>
-<body class="bg-white text-gray-800 dark:bg-gray-900 dark:text-gray-100">
+<body class="bg-white text-gray-800">
   <div id="app" class="min-h-screen flex flex-col">
     <header class="p-4 border-b bg-gradient-to-r from-indigo-500 to-cyan-400 text-white">
       <div class="container mx-auto">
@@ -30,9 +30,9 @@
             <input id="file" type="file" accept=".xlsx,.xls" class="w-full" />
             <label>시트 선택</label>
             <select id="sheetSelect" class="w-full border rounded"></select>
-            <div>
-              <label>Available Fields</label>
-              <div id="fieldList" class="mt-2 max-h-40 overflow-auto border rounded p-2 bg-white dark:bg-gray-800"></div>
+              <div>
+                <label>Available Fields</label>
+                <div id="fieldList" class="mt-2 max-h-40 overflow-auto border rounded p-2 bg-white"></div>
             </div>
           </div>
 
@@ -54,6 +54,8 @@
                 <option value="sum">sum</option>
                 <option value="mean">mean</option>
                 <option value="count">count</option>
+                <option value="min">min</option>
+                <option value="max">max</option>
               </select>
               <label>차트 타입</label>
               <select id="chartType" class="border rounded p-1">
@@ -62,11 +64,11 @@
                 <option value="bar">막대(Bar)</option>
                 <option value="area">영역(Area)</option>
               </select>
-              <button id="renderBtn" class="ml-auto px-4 py-2 bg-indigo-600 text-white rounded">차트 렌더</button>
+              <button id="renderBtn" class="ml-auto px-4 py-2 bg-indigo-600 text-white rounded">그래프 그리기 (matplotlib 스타일)</button>
               <button id="downloadImage" class="px-3 py-2 border rounded">고해상도 저장</button>
             </div>
             <div class="mt-4">
-              <div id="plot" class="w-full h-96 bg-white rounded shadow dark:bg-gray-800"></div>
+              <div id="plot" class="w-full h-96 bg-white rounded shadow"></div>
             </div>
           </div>
         </div>
@@ -81,6 +83,10 @@
               <details class="p-2 border rounded bg-white" open>
                 <summary class="font-medium cursor-pointer">축 (Axis)</summary>
                 <div class="mt-2 space-y-2 text-sm">
+                  <div>
+                    <label class="block">차트 제목</label>
+                    <input id="chartTitle" class="w-full border rounded p-1" placeholder="차트 제목 (선택)">
+                  </div>
                   <div>
                     <label class="block">X축 제목</label>
                     <input id="xTitle" class="w-full border rounded p-1" placeholder="X축 제목">
@@ -137,7 +143,7 @@
                   </div>
                   <div>
                     <label class="block">투명도 (%)</label>
-                    <input id="gridOpacity" type="number" min="0" max="100" value="100" class="w-full border rounded p-1">
+                    <input id="gridOpacity" type="number" min="0" max="100" value="30" class="w-full border rounded p-1">
                   </div>
                   <div>
                     <label class="block">대시 스타일</label>
