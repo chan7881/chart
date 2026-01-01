@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>엑셀 → Plotly 차트 변환기</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.plot.ly/plotly-2.25.2.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.min.js"></script>
+  <style>
+    html,body{height:100%}
+    .dark-mode{background:#0b1220;color:#e6eef6}
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800" id="bodyRoot">
+  <div class="max-w-6xl mx-auto p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h1 class="text-2xl font-bold">엑셀 → Plotly 차트 변환기</h1>
+      <div class="flex items-center gap-3">
+        <label class="inline-flex items-center">다크모드 <input id="darkToggle" type="checkbox" class="ml-2"/></label>
+        <button id="downloadHiRes" class="px-3 py-1 bg-indigo-600 text-white rounded">고해상도 PNG 저장</button>
+      </div>
+    </div>
+
+    <div class="border rounded bg-white p-4">
+      <div class="mb-4">
+        <button id="tab-upload" class="px-4 py-2 bg-blue-500 text-white rounded mr-2">자료 수집</button>
+        <button id="tab-edit" class="px-4 py-2 bg-gray-200 text-gray-700 rounded">차트 수정</button>
+      </div>
+
+      <div id="panel-upload">
+        <label class="block mb-2 font-medium">엑셀 파일 업로드</label>
+        <input id="fileInput" type="file" accept=".xlsx,.xls" class="mb-3" />
+        <div class="mb-3">
+          <button id="btnLoad" class="px-3 py-2 bg-green-500 text-white rounded">파일 로드</button>
+        </div>
+        <div id="columnsArea" class="grid grid-cols-2 gap-4"></div>
+        <div class="mt-4">
+          <label class="block font-medium">차트 유형</label>
+          <select id="chartType" class="border p-2 rounded">
+            <option value="scatter">분산형 (기본)</option>
+            <option value="line">선형</option>
+            <option value="bar">막대형</option>
+          </select>
+        </div>
+        <div class="mt-4">
+          <button id="btnPlot" class="px-4 py-2 bg-blue-600 text-white rounded">차트 생성</button>
+        </div>
+      </div>
+
+      <div id="panel-edit" class="hidden">
+        <h2 class="font-semibold mb-2">차트 수정</h2>
+        <div class="grid grid-cols-2 gap-4">
+          <div class="p-3 border rounded bg-gray-50">
+            <h3 class="font-medium mb-2">축 설정</h3>
+            <label class="block">차트 제목</label>
+            <input id="titleInput" class="border p-1 rounded w-full mb-2" />
+            <label class="block">X축 제목</label>
+            <input id="xlabelInput" class="border p-1 rounded w-full mb-2" />
+            <label class="block">Y축 제목</label>
+            <input id="ylabelInput" class="border p-1 rounded w-full mb-2" />
+            <label class="block">X축 범위 (예: 0,100)</label>
+            <input id="xlimInput" class="border p-1 rounded w-full mb-2" placeholder="시작,끝" />
+            <label class="block">Y축 범위 (예: 0,100)</label>
+            <input id="ylimInput" class="border p-1 rounded w-full mb-2" placeholder="시작,끝" />
+            <label class="inline-flex items-center"><input id="xlog" type="checkbox" class="mr-2"/> X축 로그</label>
+            <label class="inline-flex items-center ml-4"><input id="yinvert" type="checkbox" class="mr-2"/> Y축 반전</label>
+          </div>
+
+          <div class="p-3 border rounded bg-gray-50">
+            <h3 class="font-medium mb-2">눈금선 / 범례</h3>
+            <label class="inline-flex items-center"><input id="gridToggle" type="checkbox" class="mr-2"/> 눈금선 표시</label>
+            <div class="mt-2">
+              <label class="block">눈금선 색</label>
+              <input id="gridColor" type="color" value="#999999" class="w-20 h-8" />
+            </div>
+            <div class="mt-2">
+              <label class="block">눈금선 투명도</label>
+              <input id="gridAlpha" type="range" min="0" max="1" step="0.1" value="0.5" />
+            </div>
+
+            <div class="mt-2">
+              <label>범례 위치</label>
+              <select id="legendPos" class="border p-1 rounded w-full">
+                <option value="top right">우상</option>
+                <option value="top left">좌상</option>
+                <option value="bottom left">좌하</option>
+                <option value="bottom right">우하</option>
+                <option value="outside">차트 외부</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="p-3 border rounded bg-gray-50 mt-3">
+            <h3 class="font-medium mb-2">오차막대</h3>
+            <label class="inline-flex items-center"><input id="ebEnabled" type="checkbox" class="mr-2"/> 표시</label>
+            <label class="block mt-2">오차량 유형</label>
+            <select id="ebMode" class="border p-1 rounded w-full">
+              <option value="fixed">고정값</option>
+              <option value="percent">백분율</option>
+              <option value="std">표준편차</option>
+            </select>
+            <label class="block mt-2">값 (고정 또는 %)</label>
+            <input id="ebAmount" class="border p-1 rounded w-full" />
+          </div>
+
+          <div class="p-3 border rounded bg-gray-50 mt-3">
+            <h3 class="font-medium mb-2">추세선</h3>
+            <label class="inline-flex items-center"><input id="trendEnabled" type="checkbox" class="mr-2"/> 표시</label>
+            <label class="block mt-2">유형</label>
+            <select id="trendType" class="border p-1 rounded w-full">
+              <option value="linear">선형</option>
+              <option value="poly">다항식</option>
+            </select>
+            <label class="block mt-2">다항식 차수 (poly일때)</label>
+            <input id="trendDegree" class="border p-1 rounded w-full" value="2" />
+            <label class="inline-flex items-center mt-2"><input id="trendShowEq" type="checkbox" class="mr-2"/> 식 표시</label>
+          </div>
+
+          <div id="seriesSettings" class="p-3 border rounded bg-gray-50 mt-3">
+            <h3 class="font-medium mb-2">데이터 계열 서식</h3>
+            <div id="seriesControls" class="space-y-2 text-sm"></div>
+          </div>
+        </div>
+
+        <div class="mt-4">
+          <button id="btnUpdate" class="px-4 py-2 bg-indigo-600 text-white rounded">설정 반영</button>
+        </div>
+      </div>
+
+      <div class="mt-6">
+        <h3 class="font-medium mb-2">미리보기</h3>
+        <div id="previewArea" class="p-4 bg-white border rounded min-h-[420px]"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
