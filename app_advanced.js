@@ -234,6 +234,12 @@ function aggregate(data, xKeys, yKeys, agg){
         row[yk] = v.count;
       } else if(agg === 'mean'){
         row[yk] = (v.sums[yk] || 0) / v.count;
+      } else if(agg === 'min'){
+        const vals = v.values[yk] || [];
+        row[yk] = vals.length ? Math.min(...vals) : 0;
+      } else if(agg === 'max'){
+        const vals = v.values[yk] || [];
+        row[yk] = vals.length ? Math.max(...vals) : 0;
       } else {
         row[yk] = v.sums[yk] || 0;
       }
@@ -477,7 +483,7 @@ function buildLayout(data, xKeys, yKeys){
   
   const layout = {
     title: {
-      text: '차트',
+      text: (document.getElementById('chartTitle') && document.getElementById('chartTitle').value) || '차트',
       font: {
         size: 14,
         family: 'Malgun Gothic, 맑은 고딕, Arial',
