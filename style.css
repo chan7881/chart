@@ -1,6 +1,5 @@
 /* Minimal additions on top of Tailwind */
 :root{--bg:#ffffff; --fg:#111827}
-html.dark{--bg:#0b1220; --fg:#f3f4f6}
 body{font-family:'Malgun Gothic','맑은 고딕',system-ui,Segoe UI,Helvetica,Arial; background:var(--bg); color:var(--fg)}
 #fieldList{border:1px solid #e5e7eb; padding:6px; max-height:200px; overflow:auto}
 #plot, #plot2{border-radius:8px}
