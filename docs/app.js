@@ -10,7 +10,7 @@ const tabEdit = document.getElementById('tab-edit');
 const panelUpload = document.getElementById('panel-upload');
 const panelEdit = document.getElementById('panel-edit');
 const swapAxes = document.getElementById('swapAxes');
-const btnUpdate = document.getElementById('btnUpdate');
+const btnUpdate = document.getElementById('btnUpdatePreview');
 
 // state: track swapped columns
 let isSwapped = false;
@@ -49,7 +49,7 @@ function renderColumns(cols){
     el.className = 'p-2';
     el.innerHTML = `
       <div class="font-medium">${c}</div>
-      <label class="text-sm">X<input type="radio" name="xfield" value="${c}" class="ml-2" /></label>
+      <label class="text-sm">X<input type="checkbox" name="xfield" value="${c}" class="ml-2" /></label>
       <label class="text-sm ml-2">Y<input type="checkbox" name="yfield" value="${c}" class="ml-2" /></label>
     `;
     if (i % 2 === 0) left.appendChild(el); else right.appendChild(el);
@@ -104,9 +104,9 @@ function polyval(coeffs, x){
 
 btnPlot.addEventListener('click', async ()=>{
   if (!workbookData) return alert('먼저 파일을 로드하세요');
-  const xradio = document.querySelector('input[name="xfield"]:checked');
+  const xchecks = Array.from(document.querySelectorAll('input[name="xfield"]:checked'));
   const ychecks = Array.from(document.querySelectorAll('input[name="yfield"]:checked'));
-  const x_fields = xradio ? [xradio.value] : [];
+  const x_fields = xchecks.map(i=>i.value).slice(0,2);
   const y_fields = ychecks.map(i=>i.value);
   selectedYFields = y_fields; // store for label UI
   const chartType = document.getElementById('chartType').value;
@@ -117,14 +117,15 @@ btnPlot.addEventListener('click', async ()=>{
     plot_df = pivotAndAggregate(workbookData, x_fields, y_fields);
   }
 
-  // Update Y-axis label UI
+  // Update Y-axis and X-axis label UI
   updateYAxisLabelUI(y_fields);
+  updateXAxisLabelUI(x_fields);
 
   // build traces
   const traces = [];
   const layout = {
     title: {text: document.getElementById('titleInput').value || '', font:{size:14, family:'Arial, sans-serif', color:'#000'}},
-    xaxis:{title: {text: document.getElementById('xlabelInput').value || (x_fields[0]||''), font:{size:12, color:'#000'}}, showgrid:false, zeroline:false, showline:true, linewidth:1.5, linecolor:'#000', mirror:true},
+    xaxis:{title: {text: document.getElementById('xlabel_0')?.value || (x_fields[0]||''), font:{size:12, color:'#000'}}, showgrid:false, zeroline:false, showline:true, linewidth:1.5, linecolor:'#000', mirror:true},
     yaxis:{title: {text: document.getElementById('ylabel_0')?.value || document.getElementById('ylabelInput').value || (y_fields[0]||''), font:{size:12, color:'#000'}}, showgrid:false, zeroline:false, showline:true, linewidth:1.5, linecolor:'#000', mirror:true},
     template:'plotly_white',
     font:{family:'Arial, sans-serif', size:11, color:'#000'},
@@ -147,18 +148,7 @@ btnPlot.addEventListener('click', async ()=>{
       marker: {color: color, size: options.series[ycol]?.markersize || 6, opacity: 1.0, symbol: options.series[ycol]?.marker || 'circle'},
       line: {color: color, width: options.series[ycol]?.linewidth || 2, dash: options.series[ycol]?.linestyle || 'solid'},
     };
-    // errorbars
-    if (options.errorbars.enabled){
-      const mode = options.errorbars.mode;
-      if (mode==='fixed'){
-        trace.error_y = {type:'data', array: yvals.map(()=>Number(options.errorbars.amount||0)), visible:true};
-      } else if (mode==='percent'){
-        trace.error_y = {type:'data', array: yvals.map(v=>Math.abs(v)*Number(options.errorbars.amount||0)/100.0), visible:true};
-      } else if (mode==='std'){
-        const std = Math.sqrt(yvals.reduce((s,v)=>s + Math.pow(v - (yvals.reduce((a,b)=>a+b,0)/yvals.length),2),0)/yvals.length);
-        trace.error_y = {type:'data', array: yvals.map(()=>std), visible:true};
-      }
-    }
+    // errorbars removed
 
     // dual axis: second series assign to yaxis: 'y2'
     if (idx===1 && options.dual_axis){
@@ -181,7 +171,7 @@ btnPlot.addEventListener('click', async ()=>{
         for (let i=0;i<xv.length;i++){ num += (xv[i]-xmean)*(yv[i]-ymean); den += Math.pow(xv[i]-xmean,2); }
         const slope = den===0?0: num/den; const intercept = ymean - slope*xmean;
         const trendY = xv.map(xx=> intercept + slope*xx);
-        traces.push({x:xv, y:trendY, mode:'lines', name: ycol + ' 추세선', line:{dash:'dash', width:2, color: color}});
+        traces.push({x:xv, y:trendY, mode:'lines', name: ycol + ' 추세선', line:{dash: options.trendline.style || 'dash', width: options.trendline.width || 2, color: options.trendline.color || color}});
         if (options.trendline.showEq){
           const eq = `y=${slope.toFixed(3)}x+${intercept.toFixed(3)}`;
           layout.annotations = (layout.annotations||[]).concat([{x: xv[Math.floor(xv.length/2)], y: trendY[Math.floor(trendY.length/2)], text: eq, showarrow:false}]);
@@ -193,7 +183,7 @@ btnPlot.addEventListener('click', async ()=>{
           const coeffs = polyfit(xv, yv, deg); // math.js vector
           const coeffsArr = coeffs.map(c=>c);
           const trendY = polyval(coeffsArr, xv);
-          traces.push({x:xv, y:trendY, mode:'lines', name: ycol + ' 추세선', line:{dash:'dash', width:2, color: color}});
+          traces.push({x:xv, y:trendY, mode:'lines', name: ycol + ' 추세선', line:{dash: options.trendline.style || 'dash', width: options.trendline.width || 2, color: options.trendline.color || color}});
           if (options.trendline.showEq){
             const eq = coeffsArr.map((c,i)=> `${c.toFixed(3)}x^${i}` ).join(' + ');
             layout.annotations = (layout.annotations||[]).concat([{x: xv[Math.floor(xv.length/2)], y: trendY[Math.floor(trendY.length/2)], text: eq, showarrow:false, font:{size:10}}]);
@@ -230,11 +220,21 @@ btnPlot.addEventListener('click', async ()=>{
     }
   }
 
+  // legend visibility
+  layout.showlegend = document.getElementById('legendShow') ? document.getElementById('legendShow').checked : true;
+
   // axis ranges and log
   if (options.axis.xlim){ layout.xaxis.range = options.axis.xlim.map(Number); }
   if (options.axis.ylim){ layout.yaxis.range = options.axis.ylim.map(Number); }
   if (options.axis.xlog){ layout.xaxis.type='log'; }
   if (options.axis.yinvert){ layout.yaxis.autorange='reversed'; }
+
+  // X axis 2 title (if second X selected)
+  const xchecks = Array.from(document.querySelectorAll('input[name="xfield"]:checked'));
+  if (xchecks.length>1){
+    const x2label = document.getElementById('xlabel_1')?.value || xchecks[1].value || '';
+    layout.xaxis2 = {overlaying: 'x', side: 'top', title: {text: x2label, font:{size:12, color:'#000'}}, showgrid:false, zeroline:false, showline:true, linewidth:1.5, linecolor:'#000', mirror:true};
+  }
 
   // render
   previewArea.innerHTML = '';
@@ -268,7 +268,15 @@ function collectOptionsFromUI(){
   
   // trendline - only if show-trendline is checked
   const showTrend = document.getElementById('show-trendline').checked;
-  options.trendline = showTrend ? {enabled: document.getElementById('trendEnabled').checked, type: document.getElementById('trendType').value, degree: Number(document.getElementById('trendDegree').value||2), showEq: document.getElementById('trendShowEq').checked} : {enabled:false};
+  options.trendline = showTrend ? {
+    enabled: document.getElementById('trendEnabled').checked,
+    type: document.getElementById('trendType').value,
+    degree: Number(document.getElementById('trendDegree').value||2),
+    showEq: document.getElementById('trendShowEq').checked,
+    color: document.getElementById('trendColor')?.value || '#000000',
+    style: document.getElementById('trendStyle')?.value || 'dash',
+    width: Number(document.getElementById('trendWidth')?.value || 2)
+  } : {enabled:false};
   
   // datalabels - only if show-datalabels is checked
   const showDl = document.getElementById('show-datalabels').checked;
@@ -337,6 +345,18 @@ function updateYAxisLabelUI(yfields){
     `;
     container.appendChild(div);
   });
+}
+
+function updateXAxisLabelUI(x_fields){
+  const container = document.getElementById('xlabels-container');
+  if (!container) return;
+  container.innerHTML = '';
+  for (let i=0;i<Math.min(2,x_fields.length);i++){
+    const div = document.createElement('div');
+    div.className = 'mb-2';
+    div.innerHTML = `<label class="block text-sm font-medium text-gray-700">X축 ${i+1} 제목</label><input type="text" id="xlabel_${i}" class="mt-1 block w-full border-gray-300 rounded-md" value="${x_fields[i]||''}">`;
+    container.appendChild(div);
+  }
 }
 
 // High-res download (removed as requested)
