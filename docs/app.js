@@ -244,8 +244,8 @@ btnPlot.addEventListener('click', async ()=>{
 
 function collectOptionsFromUI(){
   const options = {};
-  options.xlabel = document.getElementById('xlabelInput').value || '';
-  options.ylabel = document.getElementById('ylabelInput').value || '';
+  options.xlabel = document.getElementById('xlabel_0')?.value || document.getElementById('xlabelInput')?.value || '';
+  options.ylabel = document.getElementById('ylabel_0')?.value || document.getElementById('ylabelInput')?.value || '';
   options.axis = {};
   const xlim = document.getElementById('xlimInput').value.split(',').map(s=>s.trim()).filter(Boolean);
   if (xlim.length===2) options.axis.xlim = [Number(xlim[0]), Number(xlim[1])];
@@ -261,9 +261,8 @@ function collectOptionsFromUI(){
   // legend
   options.legend = {position: document.getElementById('legendPos').value};
   
-  // errorbars - only if show-errorbars is checked
-  const showEb = document.getElementById('show-errorbars').checked;
-  options.errorbars = showEb ? {enabled: document.getElementById('ebEnabled').checked, mode: document.getElementById('ebMode').value, amount: Number(document.getElementById('ebAmount').value||0)} : {enabled:false};
+  // errorbars removed — keep disabled to avoid missing DOM refs
+  options.errorbars = {enabled:false};
   
   // trendline - only if show-trendline is checked
   const showTrend = document.getElementById('show-trendline').checked;
@@ -365,21 +364,21 @@ btnUpdate.addEventListener('click', ()=>{ btnPlot.click(); });
 
 // X/Y축 전환
 swapAxes.addEventListener('click', ()=>{
-  const xradio = document.querySelector('input[name="xfield"]:checked');
+  const xchecks = Array.from(document.querySelectorAll('input[name="xfield"]:checked'));
   const ychecks = Array.from(document.querySelectorAll('input[name="yfield"]:checked'));
-  if (!xradio && ychecks.length === 0) return alert('축을 설정하세요');
-  if (ychecks.length > 1) return alert('Y축은 1개만 선택해주세요');
-  
+  if (xchecks.length===0 && ychecks.length===0) return alert('축을 설정하세요');
+  if (xchecks.length !== 1 || ychecks.length !== 1) return alert('X와 Y는 각각 1개씩 선택해야 전환할 수 있습니다');
+
   // uncheck all
   document.querySelectorAll('input[name="xfield"], input[name="yfield"]').forEach(i=>i.checked=false);
-  
+
   // swap: current X -> Y, current Y -> X
-  if (xradio && ychecks.length===1){
-    const xval = xradio.value;
-    const yval = ychecks[0].value;
-    document.querySelector(`input[name="xfield"][value="${yval}"]`).checked=true;
-    document.querySelector(`input[name="yfield"][value="${xval}"]`).checked=true;
-  }
+  const xval = xchecks[0].value;
+  const yval = ychecks[0].value;
+  const targetX = document.querySelector(`input[name="xfield"][value="${yval}"]`);
+  const targetY = document.querySelector(`input[name="yfield"][value="${xval}"]`);
+  if (targetX) targetX.checked = true;
+  if (targetY) targetY.checked = true;
   renderSeriesControls();
 });
 
