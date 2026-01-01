@@ -35,7 +35,47 @@
         <div class="mb-3">
           <button id="btnLoad" class="px-3 py-2 bg-green-500 text-white rounded">파일 로드</button>
         </div>
-        <div id="columnsArea" class="grid grid-cols-2 gap-4"></div>
+
+        <!-- 축 선택 -->
+        <div class="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium mb-2">X축 선택</label>
+            <div class="mb-2">
+              <label class="block text-xs text-gray-600 mb-1">주축 (Bottom)</label>
+              <select id="xAxisMain" class="border p-2 rounded w-full text-sm">
+                <option value="">선택 안함</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-600 mb-1">보조축 (Top)</label>
+              <select id="xAxisSub" class="border p-2 rounded w-full text-sm">
+                <option value="">선택 안함</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-2">Y축 선택</label>
+            <div class="mb-2">
+              <label class="block text-xs text-gray-600 mb-1">주축 (Left)</label>
+              <select id="yAxisMain" class="border p-2 rounded w-full text-sm">
+                <option value="">선택 안함</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-600 mb-1">보조축 (Right)</label>
+              <select id="yAxisSub" class="border p-2 rounded w-full text-sm">
+                <option value="">선택 안함</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- 표시할 값 선택 -->
+        <div class="mt-4">
+          <label class="block text-sm font-medium mb-2">표시할 값</label>
+          <div id="columnsArea" class="grid grid-cols-2 gap-2"></div>
+        </div>
+
         <div class="mt-4">
           <label class="block font-medium">차트 유형</label>
           <select id="chartType" class="border p-2 rounded">
@@ -51,9 +91,6 @@
 
       <div id="panel-edit" class="hidden">
         <h2 class="font-semibold mb-4 text-lg">차트 수정</h2>
-        <div class="mb-4 flex gap-2">
-          <button id="swapAxes" class="px-4 py-2 bg-orange-500 text-white rounded">X/Y축 전환</button>
-        </div>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           <!-- 축 설정 -->
