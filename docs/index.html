@@ -3,141 +3,117 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>논문용 그래프 생성기 | 반응형</title>
+  <title>논문용 그래프 생성기 | 보조축 완벽 지원</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.plot.ly/plotly-2.25.2.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     .card { background: white; border-radius: 0.75rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); border: 1px solid #e5e7eb; padding: 1.25rem; }
     .nav-tab { transition: all 0.2s; cursor: pointer; border-radius: 0.5rem 0.5rem 0 0; }
-    #previewArea { min-height: 400px; background-image: radial-gradient(#e5e7eb 1px, transparent 1px); background-size: 20px 20px; }
+    #previewArea { min-height: 450px; background-color: #ffffff; }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-900 min-h-screen">
+<body class="bg-slate-50 text-slate-900">
   <div class="max-w-7xl mx-auto p-4 md:p-8">
-    <header class="mb-8 text-center md:text-left">
-      <h1 class="text-3xl font-extrabold text-slate-800 tracking-tight">Paper Graph Generator</h1>
-      <p class="text-slate-500 mt-2">엑셀 데이터를 논문 규격의 PNG로 변환합니다.</p>
+    <header class="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div>
+        <h1 class="text-3xl font-extrabold text-slate-800 tracking-tight">Paper Graph Pro</h1>
+        <p class="text-slate-500 mt-1 font-medium">보조축 및 교차 전환이 포함된 논문 규격 그래프 생성</p>
+      </div>
+      <button id="btnSwapAxis" class="flex items-center gap-2 px-5 py-2.5 bg-slate-800 text-white rounded-full text-sm font-bold hover:bg-blue-600 transition shadow-lg">
+        <span id="swapIcon">🔄</span> <span id="swapText">축 교차 전환 (Swap X-Y) Off</span>
+      </button>
     </header>
 
-    <div class="flex space-x-1 border-b border-slate-200 mb-6 overflow-x-auto">
-      <button id="tab-upload" class="nav-tab px-6 py-2.5 text-sm font-bold bg-blue-600 text-white whitespace-nowrap">1. 데이터 및 축 설정</button>
-      <button id="tab-edit" class="nav-tab px-6 py-2.5 text-sm font-bold bg-slate-200 text-slate-600 hover:bg-slate-300 whitespace-nowrap">2. 스타일 정밀 수정</button>
+    <div class="flex space-x-1 border-b border-slate-200 mb-6">
+      <button id="tab-upload" class="nav-tab px-6 py-2.5 text-sm font-bold bg-blue-600 text-white">1. 데이터 및 축 설정</button>
+      <button id="tab-edit" class="nav-tab px-6 py-2.5 text-sm font-bold bg-slate-200 text-slate-600 hover:bg-slate-300">2. 스타일 정밀 수정</button>
     </div>
 
     <div id="panel-upload" class="space-y-6">
       <div class="card">
-        <h2 class="text-lg font-bold mb-4 flex items-center gap-2">📂 데이터 파일 업로드</h2>
-        <div class="flex flex-col md:flex-row gap-4">
+        <div class="flex flex-col md:flex-row gap-4 items-center">
           <input id="fileInput" type="file" accept=".xlsx,.xls" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
-          <button id="btnLoad" class="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition shadow-sm">데이터 로드</button>
+          <button id="btnLoad" class="w-full md:w-48 bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition">엑셀 로드</button>
         </div>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="card border-l-4 border-l-blue-500">
-          <h3 class="font-bold text-sm text-blue-800 mb-4 uppercase tracking-wider">X축 (독립 변수)</h3>
+        <div class="card border-t-4 border-t-blue-500">
+          <h3 class="font-bold text-sm text-blue-800 mb-4 uppercase tracking-tighter italic">X-Axis Configuration</h3>
           <div class="space-y-4">
-            <div><label class="text-[11px] font-bold text-slate-400">Main X-Axis</label><select id="xAxisMain" class="w-full border p-2.5 rounded-md text-sm bg-slate-50"></select></div>
-            <div><label class="text-[11px] font-bold text-slate-400">Sub X-Axis (Optional)</label><select id="xAxisSub" class="w-full border p-2.5 rounded-md text-sm bg-slate-50"></select></div>
+            <div><label class="text-[11px] font-bold text-slate-400">Main X-Axis</label><select id="xAxisMain" class="w-full border p-2 rounded bg-slate-50 text-sm"></select></div>
+            <div><label class="text-[11px] font-bold text-slate-400">Sub X-Axis (Optional)</label><select id="xAxisSub" class="w-full border p-2 rounded bg-slate-50 text-sm"></select></div>
           </div>
         </div>
-        <div class="card border-l-4 border-l-emerald-500">
-          <h3 class="font-bold text-sm text-emerald-800 mb-4 uppercase tracking-wider">Y축 (종속 변수)</h3>
+        <div class="card border-t-4 border-t-emerald-500">
+          <h3 class="font-bold text-sm text-emerald-800 mb-4 uppercase tracking-tighter italic">Y-Axis Configuration</h3>
           <div class="space-y-4">
-            <div><label class="text-[11px] font-bold text-slate-400">Main Y-Axis</label><select id="yAxisMain" class="w-full border p-2.5 rounded-md text-sm bg-slate-50"></select></div>
-            <div><label class="text-[11px] font-bold text-slate-400">Secondary Y-Axis (Right)</label><select id="yAxisSub" class="w-full border p-2.5 rounded-md text-sm bg-slate-50"></select></div>
+            <div><label class="text-[11px] font-bold text-slate-400">Main Y-Axis</label><select id="yAxisMain" class="w-full border p-2 rounded bg-slate-50 text-sm"></select></div>
+            <div><label class="text-[11px] font-bold text-slate-400">Secondary Y-Axis (Right)</label><select id="yAxisSub" class="w-full border p-2 rounded bg-slate-50 text-sm"></select></div>
           </div>
         </div>
       </div>
 
       <div class="card">
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
-          <h3 class="font-bold text-slate-800">📊 데이터 계열 선택</h3>
-          <button id="btnSwapAxis" class="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 border border-amber-200 rounded-full text-xs font-bold hover:bg-amber-100 transition">
-            <span id="swapIcon">🔄</span> <span id="swapText">축 교차 전환 (Swap X-Y) Off</span>
-          </button>
-        </div>
-        <div id="columnsArea" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 p-4 border rounded-xl bg-slate-50 max-h-64 overflow-y-auto"></div>
+        <h3 class="font-bold text-slate-800 mb-4">📊 데이터 계열 선택</h3>
+        <div id="columnsArea" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 p-4 border rounded-xl bg-slate-50 max-h-60 overflow-y-auto shadow-inner"></div>
       </div>
 
-      <div class="flex flex-col md:flex-row gap-4 items-stretch md:items-end">
-        <div class="md:w-1/4">
-          <label class="block text-sm font-bold mb-2">기본 그래프 타입</label>
-          <select id="chartType" class="w-full border p-3 rounded-lg bg-white shadow-sm font-medium">
-            <option value="scatter">분산형/선형 (Scatter/Line)</option>
-            <option value="bar">막대형 (Bar Chart)</option>
-          </select>
-        </div>
-        <button id="btnPlot" class="flex-1 py-4 bg-slate-800 text-white rounded-lg font-bold text-lg hover:bg-slate-900 shadow-lg transition transform active:scale-[0.98]">그래프 생성 및 시각화</button>
+      <div class="flex flex-col md:flex-row gap-4">
+        <select id="chartType" class="md:w-1/4 border p-3 rounded-lg bg-white font-bold shadow-sm">
+          <option value="scatter">Scatter / Line</option>
+          <option value="bar">Bar Chart</option>
+        </select>
+        <button id="btnPlot" class="flex-1 py-4 bg-slate-800 text-white rounded-lg font-bold text-lg hover:bg-slate-900 shadow-xl transition transform active:scale-[0.99]">그래프 생성 및 시각화</button>
       </div>
     </div>
 
     <div id="panel-edit" class="hidden space-y-6">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="card">
-          <div class="font-bold border-b pb-2 mb-4">축 라벨 및 범위</div>
+          <div class="font-bold border-b pb-2 mb-4">라벨 커스텀</div>
           <div class="space-y-3">
-            <input id="titleInput" placeholder="그래프 제목 (Title)" class="w-full border p-2 text-sm rounded" />
+            <input id="titleInput" placeholder="Graph Title" class="w-full border p-2 text-sm rounded" />
             <div id="xlabels-container" class="space-y-2"></div>
-            <div id="ylabels-container" class="space-y-2 border-t pt-2"></div>
-            <div class="flex gap-4 pt-2">
-              <label class="inline-flex items-center text-xs font-medium"><input id="xlog" type="checkbox" class="mr-2 rounded" /> X-축 Log Scale</label>
-              <label class="inline-flex items-center text-xs font-medium"><input id="yinvert" type="checkbox" class="mr-2 rounded" /> Y-축 반전 (Invert)</label>
+            <div id="ylabels-container" class="space-y-2"></div>
+            <div class="flex gap-4 pt-2 border-t mt-2">
+              <label class="inline-flex items-center text-xs"><input id="xlog" type="checkbox" class="mr-2" /> Log Scale</label>
+              <label class="inline-flex items-center text-xs"><input id="yinvert" type="checkbox" class="mr-2" /> Invert Y</label>
             </div>
           </div>
         </div>
-
         <div class="card">
-          <div class="font-bold border-b pb-2 mb-4">스타일 가이드</div>
-          <div class="space-y-5">
-            <div>
-              <label class="text-xs font-bold text-slate-500 block mb-2 uppercase">Background & Grid</label>
-              <div class="flex items-center gap-4">
-                <label class="inline-flex items-center text-sm"><input id="gridToggle" type="checkbox" class="mr-2" /> 눈금선 표시</label>
-                <input id="gridColor" type="color" value="#f0f0f0" class="h-8 w-16 rounded border cursor-pointer" />
-              </div>
+          <div class="font-bold border-b pb-2 mb-4">논문 스타일 설정</div>
+          <div class="space-y-4">
+            <div class="flex items-center justify-between">
+              <label class="text-sm font-medium"><input id="gridToggle" type="checkbox" class="mr-2" /> Grid Line</label>
+              <input id="gridColor" type="color" value="#f1f1f1" class="h-8 w-12 border rounded" />
             </div>
-            <div>
-              <label class="text-xs font-bold text-slate-500 block mb-2 uppercase">Legend (범례)</label>
-              <div class="flex gap-4 items-center">
-                <label class="inline-flex items-center text-sm"><input id="legendShow" type="checkbox" class="mr-2" checked /> 표시</label>
-                <select id="legendPos" class="border text-sm p-1 rounded">
-                  <option value="top right">우측 상단</option>
-                  <option value="top left">좌측 상단</option>
-                </select>
-              </div>
+            <div class="flex items-center justify-between border-t pt-2">
+              <label class="text-sm font-medium"><input id="legendShow" type="checkbox" class="mr-2" checked /> Legend</label>
+              <select id="legendPos" class="border text-xs p-1 rounded"><option value="top right">Top-Right</option><option value="top left">Top-Left</option></select>
             </div>
           </div>
         </div>
-
         <div class="card md:col-span-2">
-          <div class="font-bold border-b pb-2 mb-4 flex justify-between items-center">
-            <span>데이터 계열 서식 설정</span>
-            <span class="text-[10px] text-slate-400 font-normal">개별 계열의 색상과 심볼을 변경할 수 있습니다.</span>
-          </div>
-          <div id="seriesControls" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+            <div class="font-bold border-b pb-2 mb-4">계열 상세 설정 (Series Formatting)</div>
+            <div id="seriesControls" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
         </div>
       </div>
-
-      <div class="card flex flex-col md:flex-row gap-4 items-center justify-between bg-slate-800 text-white">
-        <div class="flex items-center gap-4">
-          <span class="font-bold text-sm">출력 해상도(PX):</span>
-          <input id="chartWidth" type="number" placeholder="Width" class="w-24 p-2 rounded bg-slate-700 border-none text-sm text-white focus:ring-2 focus:ring-blue-500" />
+      <div class="card bg-slate-800 text-white flex flex-col md:flex-row items-center gap-6">
+        <div class="flex items-center gap-3">
+          <span class="text-sm font-bold">Size:</span>
+          <input id="chartWidth" type="number" placeholder="W" class="w-20 p-2 rounded bg-slate-700 text-white text-sm" />
           <span class="text-slate-500">×</span>
-          <input id="chartHeight" type="number" placeholder="Height" class="w-24 p-2 rounded bg-slate-700 border-none text-sm text-white focus:ring-2 focus:ring-blue-500" />
+          <input id="chartHeight" type="number" placeholder="H" class="w-20 p-2 rounded bg-slate-700 text-white text-sm" />
         </div>
-        <button id="btnUpdatePreview" class="w-full md:w-auto px-10 py-3 bg-blue-500 hover:bg-blue-400 text-white rounded-lg font-bold transition shadow-lg">설정 변경 사항 적용</button>
+        <button id="btnUpdatePreview" class="w-full md:w-auto px-10 py-3 bg-blue-500 text-white rounded-lg font-bold">변경 사항 반영</button>
       </div>
     </div>
 
     <div class="mt-8">
-      <div id="previewArea" class="card flex items-center justify-center border-dashed border-2 border-slate-300">
-        <div class="text-center">
-          <p class="text-slate-400 font-medium">데이터를 로드하고 '그래프 생성' 버튼을 클릭하세요.</p>
-          <p class="text-slate-300 text-sm mt-1">논문용 표준 폰트 및 흑백 설정이 자동 적용됩니다.</p>
-        </div>
-      </div>
+      <div id="previewArea" class="card min-h-[500px] border-2 border-slate-200"></div>
     </div>
   </div>
   <script src="app.js"></script>
