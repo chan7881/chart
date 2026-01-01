@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Excel Pivot Visualizer (Static)</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Excel Pivot Visualizer</h1>
+  </header>
+
+  <main>
+    <section id="controls">
+      <div class="col">
+        <label>Upload Excel (.xlsx)</label>
+        <input id="file" type="file" accept=".xlsx,.xls" />
+        <label>Sheet</label>
+        <select id="sheetSelect"></select>
+        <div id="fields">
+          <label>Available Fields</label>
+          <div id="fieldList"></div>
+        </div>
+        <label>X-axis (max 2)</label>
+        <select id="xSelect" multiple size="4"></select>
+        <label>Y-axis (max 2)</label>
+        <select id="ySelect" multiple size="4"></select>
+        <label>Aggregation</label>
+        <select id="aggSelect"><option value="none">none</option><option value="sum">sum</option><option value="mean">mean</option><option value="count">count</option></select>
+      </div>
+
+      <div class="col">
+        <h3>Design Settings</h3>
+        <label>Title</label>
+        <input id="titleInput" type="text">
+        <label>Color Theme</label>
+        <select id="themeSelect"><option>Plotly</option><option>Viridis</option></select>
+        <label>Font size</label>
+        <input id="fontInput" type="number" min="8" max="24">
+        <label><input id="gridInput" type="checkbox"> Show grid</label>
+        <div class="buttons">
+          <button id="renderBtn">Render Chart</button>
+          <button id="downloadBtn">Download CSV</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="chart">
+      <div id="plot"></div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.20.0.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
