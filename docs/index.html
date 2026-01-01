@@ -3,91 +3,121 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>엑셀 차트 변환기</title>
+  <title>논문용 엑셀 차트 생성기</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.plot.ly/plotly-2.25.2.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.min.js"></script>
   <style>
-    .card{border:1px solid #ddd;border-radius:0.5rem;padding:1rem;margin-bottom:1rem}
-    .card-header{font-weight:600;margin-bottom:0.75rem;display:flex;justify-content:space-between}
+    .card{border:1px solid #ddd;border-radius:0.5rem;padding:1rem;margin-bottom:1rem;background:white}
+    .card-header{font-weight:600;margin-bottom:0.75rem;display:flex;justify-content:space-between;border-bottom:1px solid #eee;padding-bottom:0.5rem}
   </style>
 </head>
-<body class="bg-gray-50 text-gray-800 p-6">
+<body class="bg-gray-100 text-gray-800 p-6">
   <div class="max-w-6xl mx-auto">
     <div class="flex border-b mb-4">
-      <button id="tab-upload" class="px-4 py-2 bg-blue-500 text-white rounded-t mr-1">1. 자료 수집</button>
-      <button id="tab-edit" class="px-4 py-2 bg-gray-200 rounded-t">2. 차트 세부 수정</button>
+      <button id="tab-upload" class="px-4 py-2 bg-blue-600 text-white rounded-t mr-1">1. 데이터 업로드 및 축 선택</button>
+      <button id="tab-edit" class="px-4 py-2 bg-gray-300 rounded-t">2. 논문 스타일 세부 수정</button>
     </div>
 
     <div id="panel-upload">
-      <div class="card bg-white">
-        <label class="block mb-2 font-medium">엑셀 파일 업로드</label>
-        <input id="fileInput" type="file" accept=".xlsx,.xls" class="mb-3 block w-full text-sm" />
-        <button id="btnLoad" class="px-4 py-2 bg-green-500 text-white rounded">파일 로드</button>
+      <div class="card shadow-sm">
+        <label class="block mb-2 font-bold text-lg text-blue-800">엑셀 파일 업로드</label>
+        <input id="fileInput" type="file" accept=".xlsx,.xls" class="mb-3 block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+        <button id="btnLoad" class="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">파일 데이터 로드</button>
         
-        <div class="grid grid-cols-2 gap-4 mt-4">
-          <div class="p-3 border rounded bg-gray-50">
-            <span class="font-bold text-sm block mb-2">X축 설정</span>
-            <select id="xAxisMain" class="w-full border p-1 text-sm mb-2"></select>
-            <select id="xAxisSub" class="w-full border p-1 text-sm"></select>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+          <div class="p-4 border rounded bg-blue-50/50">
+            <span class="font-bold text-sm block mb-3 text-blue-900 border-b border-blue-200">X축 설정 (독립변수)</span>
+            <div class="space-y-3">
+              <div><label class="text-xs text-gray-500">주 X축 (Bottom)</label><select id="xAxisMain" class="w-full border p-2 rounded text-sm"></select></div>
+              <div><label class="text-xs text-gray-500">보조 X축 (Top - 선택사항)</label><select id="xAxisSub" class="w-full border p-2 rounded text-sm"></select></div>
+            </div>
           </div>
-          <div class="p-3 border rounded bg-gray-50">
-            <span class="font-bold text-sm block mb-2">보조 Y축 지정</span>
-            <select id="yAxisSub" class="w-full border p-1 text-sm"></select>
-            <select id="yAxisMain" class="hidden"></select> 
+          <div class="p-4 border rounded bg-green-50/50">
+            <span class="font-bold text-sm block mb-3 text-green-900 border-b border-green-200">Y축 설정 (종속변수)</span>
+            <div class="space-y-3">
+              <div><label class="text-xs text-gray-500">주 Y축 (Left - 기본)</label><select id="yAxisMain" class="w-full border p-2 rounded text-sm"></select></div>
+              <div><label class="text-xs text-gray-500">보조 Y축 (Right - 이중축 필요시)</label><select id="yAxisSub" class="w-full border p-2 rounded text-sm"></select></div>
+            </div>
           </div>
         </div>
         
-        <div class="mt-4">
-          <label class="block text-sm font-medium mb-2">데이터 선택 (체크한 항목들이 그래프로 그려집니다)</label>
-          <div id="columnsArea" class="grid grid-cols-3 gap-2 p-3 border rounded h-40 overflow-y-auto"></div>
+        <div class="mt-6">
+          <label class="block text-sm font-bold mb-2">데이터 계열 선택 (체크한 항목이 차트에 표시됨)</label>
+          <div id="columnsArea" class="grid grid-cols-2 md:grid-cols-4 gap-2 p-3 border rounded h-48 overflow-y-auto bg-white shadow-inner"></div>
         </div>
 
-        <div class="mt-4 flex gap-4 items-end">
-          <div class="flex-1">
-            <label class="block text-sm">차트 유형</label>
+        <div class="mt-6 flex gap-4 items-end">
+          <div class="w-48">
+            <label class="block text-sm font-bold mb-1">차트 기본 유형</label>
             <select id="chartType" class="w-full border p-2 rounded">
-              <option value="scatter">분산형/선형</option>
-              <option value="bar">막대형</option>
+              <option value="scatter">분산형 (Scatter/Line)</option>
+              <option value="bar">막대형 (Bar)</option>
             </select>
           </div>
-          <button id="btnPlot" class="px-6 py-2 bg-blue-600 text-white rounded font-bold">차트 생성</button>
+          <button id="btnPlot" class="flex-1 py-3 bg-indigo-600 text-white rounded-lg font-bold text-lg hover:bg-indigo-700 shadow-md transition-all">그래프 생성 및 업데이트</button>
         </div>
       </div>
     </div>
 
     <div id="panel-edit" class="hidden">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="card bg-white">
-          <div class="card-header">축 및 제목 설정</div>
-          <label class="text-xs">차트 제목</label>
-          <input id="titleInput" class="w-full border p-1 mb-2 text-sm" />
-          <div id="xlabels-container"></div>
-          <div id="ylabels-container" class="mt-2 border-t pt-2"></div>
-          <div class="flex gap-4 mt-2">
-            <label class="text-xs"><input id="xlog" type="checkbox" /> X축 로그</label>
-            <label class="text-xs"><input id="yinvert" type="checkbox" /> Y축 반전</label>
+        <div class="card shadow-sm">
+          <div class="card-header">라벨 및 범위 설정</div>
+          <div class="space-y-2">
+            <div><label class="text-xs">그래프 제목</label><input id="titleInput" class="w-full border p-2 text-sm rounded" /></div>
+            <div id="xlabels-container" class="space-y-2"></div>
+            <div id="ylabels-container" class="space-y-2 border-t pt-2"></div>
+            <div class="grid grid-cols-2 gap-2 mt-2">
+              <label class="text-xs"><input id="xlog" type="checkbox" /> X축 로그 스케일</label>
+              <label class="text-xs"><input id="yinvert" type="checkbox" /> Y축 반전</label>
+            </div>
           </div>
         </div>
-        <div class="card bg-white">
-          <div class="card-header">눈금선 및 범례</div>
-          <label class="text-xs"><input id="gridToggle" type="checkbox" checked /> 눈금선 표시</label>
-          <input id="gridColor" type="color" value="#eeeeee" class="w-full h-8 mb-2" />
-          <label class="text-xs"><input id="legendShow" type="checkbox" checked /> 범례 표시</label>
+
+        <div class="card shadow-sm">
+          <div class="card-header">논문 스타일 가이드</div>
+          <div class="space-y-4">
+            <div>
+              <label class="text-xs font-bold block mb-1">눈금선(Grid)</label>
+              <label class="inline-flex items-center text-sm"><input id="gridToggle" type="checkbox" class="mr-2" /> 눈금선 표시 (논문은 미표시 권장)</label>
+              <input id="gridColor" type="color" value="#f0f0f0" class="w-full h-8 mt-1 border rounded" />
+            </div>
+            <div>
+              <label class="text-xs font-bold block mb-1">범례(Legend)</label>
+              <label class="inline-flex items-center text-sm"><input id="legendShow" type="checkbox" class="mr-2" checked /> 범례 표시</label>
+              <select id="legendPos" class="w-full border p-2 text-sm rounded mt-1">
+                <option value="top right">우측 상단</option>
+                <option value="top left">좌측 상단</option>
+              </select>
+            </div>
+          </div>
         </div>
-        <div class="card bg-white md:col-span-2">
-          <div class="card-header">데이터 계열별 디자인</div>
-          <div id="seriesControls" class="grid grid-cols-2 md:grid-cols-4 gap-2"></div>
+
+        <div class="card shadow-sm md:col-span-2">
+          <div class="card-header">데이터 계열 서식 (기본값: 검은색 논문 스타일)</div>
+          <div id="seriesControls" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3"></div>
         </div>
       </div>
-      <div class="flex gap-4 items-center p-4 bg-gray-100 rounded">
-        <input id="chartWidth" type="number" placeholder="너비(px)" class="border p-1 w-24 text-sm" />
-        <input id="chartHeight" type="number" placeholder="높이(px)" class="border p-1 w-24 text-sm" />
-        <button id="btnUpdatePreview" class="px-4 py-2 bg-indigo-600 text-white rounded">설정 적용</button>
+      
+      <div class="mt-4 flex gap-4 items-center p-4 bg-white border rounded shadow-sm">
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-bold">이미지 크기:</span>
+          <input id="chartWidth" type="number" placeholder="너비(px)" class="border p-2 w-28 text-sm rounded" />
+          <span class="text-gray-400">x</span>
+          <input id="chartHeight" type="number" placeholder="높이(px)" class="border p-2 w-28 text-sm rounded" />
+        </div>
+        <button id="btnUpdatePreview" class="px-8 py-2 bg-indigo-600 text-white rounded-md font-bold hover:bg-indigo-700 transition">설정 즉시 반영</button>
       </div>
     </div>
 
-    <div id="previewArea" class="mt-6 border bg-white min-h-[500px] rounded"></div>
+    <div class="mt-6">
+      <h3 class="font-bold text-gray-700 mb-2">미리보기 (우측 상단 카메라 아이콘 클릭 시 PNG 저장 가능)</h3>
+      <div id="previewArea" class="border bg-white min-h-[550px] rounded-lg shadow-inner flex items-center justify-center text-gray-300">
+        데이터 로드 후 '그래프 생성' 버튼을 눌러주세요.
+      </div>
+    </div>
   </div>
   <script src="app.js"></script>
 </body>
