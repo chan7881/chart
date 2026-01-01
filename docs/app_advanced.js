@@ -476,40 +476,70 @@ function buildLayout(data, xKeys, yKeys){
   const gridColorRgba = hexToRgba(gridColor.value, gridOpacityVal);
   
   const layout = {
-    title: '차트',
+    title: {
+      text: '차트',
+      font: {
+        size: 14,
+        family: 'Malgun Gothic, 맑은 고딕, Arial',
+        color: '#000000'
+      }
+    },
     xaxis: {
-      title: xTitle.value || xKeys[0] || 'X',
+      title: {
+        text: xTitle.value || xKeys[0] || 'X',
+        font: { size: 12, family: 'Malgun Gothic, 맑은 고딕, Arial' }
+      },
       tickangle: -45,
       tickvals: data.map((_, i) => i),
       ticktext: xLabels,
-      gridcolor: gridColorRgba,
+      gridcolor: gridColorRgba || '#e5e5e5',
       showgrid: true,
       gridwidth: parseInt(gridWidth.value) || 1,
-      reverse: xReverse.checked || false
+      zeroline: true,
+      zerolinewidth: 1,
+      zerolinecolor: '#000000',
+      reverse: xReverse.checked || false,
+      showline: true,
+      linewidth: 2,
+      linecolor: '#000000'
     },
     yaxis: {
-      title: yTitle.value || yKeys[0] || 'Y',
+      title: {
+        text: yTitle.value || yKeys[0] || 'Y',
+        font: { size: 12, family: 'Malgun Gothic, 맑은 고딕, Arial' }
+      },
       type: yLog.checked ? 'log' : 'linear',
-      gridcolor: gridColorRgba,
+      gridcolor: gridColorRgba || '#e5e5e5',
       showgrid: true,
       gridwidth: parseInt(gridWidth.value) || 1,
-      reverse: yReverse.checked || false
+      zeroline: true,
+      zerolinewidth: 1,
+      zerolinecolor: '#000000',
+      reverse: yReverse.checked || false,
+      showline: true,
+      linewidth: 2,
+      linecolor: '#000000'
     },
-    margin: { t: 60, b: 140, l: 80, r: 80 },
+    margin: { t: 80, b: 100, l: 100, r: 60 },
     showlegend: legendShowLegend.checked !== false,
     legend: {
       x: legendPosObj.x,
       y: legendPosObj.y,
       xanchor: legendPosObj.xanchor,
-      yanchor: legendPosObj.yanchor
+      yanchor: legendPosObj.yanchor,
+      bgcolor: 'rgba(255, 255, 255, 0.8)',
+      bordercolor: '#000000',
+      borderwidth: 1
     },
     paper_bgcolor: '#ffffff',
-    plot_bgcolor: '#f9fafb',
+    plot_bgcolor: '#ffffff',
     font: {
       family: 'Malgun Gothic, 맑은 고딕, Arial',
-      color: '#111827',
-      size: 12
-    }
+      color: '#000000',
+      size: 11
+    },
+    hovermode: 'closest',
+    autosize: true
   };
   
   // 축 범위 설정
@@ -571,7 +601,13 @@ function renderPlot(targetEl){
   const layout = buildLayout(data, xKeys, yKeys);
   
   try {
-    Plotly.newPlot(targetEl, traces, layout, {responsive: true});
+    const config = {
+      responsive: true,
+      displayModeBar: true,
+      displaylogo: false,
+      modeBarButtonsToRemove: ['pan2d', 'lasso2d']
+    };
+    Plotly.newPlot(targetEl, traces, layout, config);
   } catch (err) {
     console.error('Plotly 렌더링 실패:', err);
     targetEl.innerHTML = '<div class="p-4 text-red-500">차트 렌더링 실패: ' + err.message + '</div>';
@@ -626,4 +662,3 @@ settingsElements.forEach(el => {
     });
   }
 });
-
