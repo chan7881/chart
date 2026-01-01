@@ -206,9 +206,15 @@ btnPlot.addEventListener('click', async ()=>{
     };
     // errorbars removed
 
-    // dual axis: if there are 2 Y axes and this is the second trace, assign to yaxis: 'y2'
-    if (idx===1 && yAxisSub && options.dual_axis){
-      trace.yaxis = 'y2';
+    // dual axis: second trace uses either xaxis2 or yaxis2 depending on selections
+    if (idx===1 && options.dual_axis){
+      if (xAxisSub){
+        // If X sub-axis selected, use xaxis2 for second trace
+        trace.xaxis = 'x2';
+      } else if (yAxisSub){
+        // If Y sub-axis selected, use yaxis2 for second trace
+        trace.yaxis = 'y2';
+      }
     }
 
     traces.push(trace);
