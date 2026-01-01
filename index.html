@@ -53,7 +53,6 @@
         <h2 class="font-semibold mb-4 text-lg">차트 수정</h2>
         <div class="mb-4 flex gap-2">
           <button id="swapAxes" class="px-4 py-2 bg-orange-500 text-white rounded">X/Y축 전환</button>
-          <button id="btnUpdate" class="px-4 py-2 bg-indigo-600 text-white rounded">설정 반영</button>
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
@@ -67,7 +66,7 @@
               <label class="block text-sm mb-2">차트 제목</label>
               <input id="titleInput" class="border p-1 rounded w-full mb-2 text-sm" />
               <label class="block text-sm mb-2">X축 제목</label>
-              <input id="xlabelInput" class="border p-1 rounded w-full mb-2 text-sm" />
+              <div id="xlabels-container"></div>
               <label class="block text-sm mb-2">Y축 제목</label>
               <input id="ylabelInput" class="border p-1 rounded w-full mb-2 text-sm" />
               <label class="block text-sm mb-2">X축 범위 (예: 0,100)</label>
@@ -106,6 +105,9 @@
                   <option value="outside">차트 외부</option>
                 </select>
               </div>
+              <div class="mt-2">
+                <label class="inline-flex items-center text-sm"><input id="legendShow" type="checkbox" class="mr-2" checked/> 범례 표시</label>
+              </div>
             </div>
           </div>
 
@@ -116,15 +118,7 @@
               <input id="show-errorbars" type="checkbox" class="cursor-pointer"/>
             </div>
             <div id="errorbars-content">
-              <label class="inline-flex items-center text-sm"><input id="ebEnabled" type="checkbox" class="mr-2"/> 표시</label>
-              <label class="block text-sm mt-2">오차량 유형</label>
-              <select id="ebMode" class="border p-1 rounded w-full text-sm">
-                <option value="fixed">고정값</option>
-                <option value="percent">백분율</option>
-                <option value="std">표준편차</option>
-              </select>
-              <label class="block text-sm mt-2">값 (고정 또는 %)</label>
-              <input id="ebAmount" class="border p-1 rounded w-full text-sm" />
+              <div class="text-sm text-gray-600">오차막대 기능이 제거되었습니다.</div>
             </div>
           </div>
 
@@ -144,6 +138,18 @@
               <label class="block text-sm mt-2">다항식 차수 (poly일때)</label>
               <input id="trendDegree" class="border p-1 rounded w-full text-sm" value="2" />
               <label class="inline-flex items-center text-sm mt-2"><input id="trendShowEq" type="checkbox" class="mr-2"/> 식 표시</label>
+              <div class="mt-2">
+                <label class="block text-sm">추세선 색</label>
+                <input id="trendColor" type="color" value="#000000" class="w-20 h-8" />
+              </div>
+              <div class="mt-2">
+                <label class="block text-sm">추세선 스타일</label>
+                <select id="trendStyle" class="border p-1 rounded w-full text-sm"><option value="solid">실선</option><option value="dash">파선</option><option value="dot">점선</option></select>
+              </div>
+              <div class="mt-2">
+                <label class="block text-sm">추세선 너비</label>
+                <input id="trendWidth" type="number" step="0.5" value="2" class="border p-1 rounded w-full text-sm" />
+              </div>
             </div>
           </div>
 
@@ -171,7 +177,10 @@
         </div>
       </div>
 
-      <div class="mt-6">
+      <div class="mt-4">
+        <button id="btnUpdatePreview" class="px-4 py-2 bg-indigo-600 text-white rounded mb-3">설정 반영</button>
+      </div>
+      <div class="mt-2">
         <h3 class="font-medium mb-2">미리보기</h3>
         <div id="previewArea" class="p-4 bg-white border rounded min-h-[420px]"></div>
       </div>
