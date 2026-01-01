@@ -1,4 +1,4 @@
-// app.js: 기존 기능을 모두 포함하되 데이터 매칭 버그를 수정한 버전
+// app.js: 논문용 그래프 생성 최적화 및 데이터 매칭 버그 수정
 
 const fileInput = document.getElementById('fileInput');
 const btnLoad = document.getElementById('btnLoad');
@@ -17,11 +17,13 @@ let columns = [];
 // 탭 전환
 tabUpload.addEventListener('click', ()=>{
   panelUpload.classList.remove('hidden'); panelEdit.classList.add('hidden');
-  tabUpload.classList.add('bg-blue-500', 'text-white'); tabEdit.classList.remove('bg-blue-500', 'text-white');
+  tabUpload.classList.replace('bg-gray-300', 'bg-blue-600'); tabUpload.classList.add('text-white');
+  tabEdit.classList.replace('bg-blue-600', 'bg-gray-300'); tabEdit.classList.remove('text-white');
 });
 tabEdit.addEventListener('click', ()=>{
   panelUpload.classList.add('hidden'); panelEdit.classList.remove('hidden');
-  tabEdit.classList.add('bg-blue-500', 'text-white'); tabUpload.classList.remove('bg-blue-500', 'text-white');
+  tabEdit.classList.replace('bg-gray-300', 'bg-blue-600'); tabEdit.classList.add('text-white');
+  tabUpload.classList.replace('bg-blue-600', 'bg-gray-300'); tabUpload.classList.remove('text-white');
 });
 
 // 파일 로드
@@ -32,15 +34,14 @@ btnLoad.addEventListener('click', () => {
   reader.onload = (e) => {
     const data = new Uint8Array(e.target.result);
     const wb = XLSX.read(data, { type: 'array' });
-    const first = wb.SheetNames[0];
-    const ws = wb.Sheets[first];
+    const ws = wb.Sheets[wb.SheetNames[0]];
     workbookData = XLSX.utils.sheet_to_json(ws, { defval: null });
     
     if (workbookData.length === 0) return alert('데이터가 없습니다.');
     
     columns = Object.keys(workbookData[0]);
     renderColumns(columns);
-    alert(`로드 완료: ${workbookData.length}행`);
+    alert(`파일 로드 완료: ${workbookData.length}개의 행 발견`);
   };
   reader.readAsArrayBuffer(f);
 });
@@ -55,9 +56,9 @@ function renderColumns(cols) {
   columnsArea.innerHTML = '';
   cols.forEach(c => {
     const div = document.createElement('div');
-    div.className = 'flex items-center gap-2 p-1';
-    div.innerHTML = `<input type="checkbox" name="displayField" value="${c}" id="chk_${c}" />
-                     <label for="chk_${c}" class="text-sm truncate cursor-pointer">${c}</label>`;
+    div.className = 'flex items-center gap-2 p-2 hover:bg-gray-50 border rounded transition';
+    div.innerHTML = `<input type="checkbox" name="displayField" value="${c}" id="chk_${c}" class="w-4 h-4 cursor-pointer" />
+                     <label for="chk_${c}" class="text-xs truncate cursor-pointer font-medium">${c}</label>`;
     columnsArea.appendChild(div);
   });
   
@@ -66,46 +67,58 @@ function renderColumns(cols) {
   });
 }
 
-// [핵심] 차트 생성 로직
+// 차트 생성
 btnPlot.addEventListener('click', () => {
-  if (!workbookData) return alert('데이터가 없습니다.');
+  if (!workbookData) return alert('먼저 엑셀 데이터를 로드하세요.');
 
   const xAxisMain = document.getElementById('xAxisMain').value;
   const xAxisSub = document.getElementById('xAxisSub').value;
-  const yAxisSub = document.getElementById('yAxisSub').value;
+  const yAxisMain = document.getElementById('yAxisMain').value; // 주 Y축
+  const yAxisSub = document.getElementById('yAxisSub').value; // 보조 Y축
   const displayFields = Array.from(document.querySelectorAll('input[name="displayField"]:checked')).map(i => i.value);
 
-  if (!xAxisMain && !xAxisSub) return alert('X축을 선택하세요.');
-  if (displayFields.length === 0) return alert('Y축 데이터를 선택하세요.');
+  if (!xAxisMain && !xAxisSub) return alert('X축을 최소 하나 선택해야 합니다.');
+  if (displayFields.length === 0) return alert('그래프에 표시할 데이터 항목을 체크하세요.');
 
   const options = collectOptionsFromUI();
   updateAxisLabelUI([xAxisMain, xAxisSub].filter(Boolean), displayFields);
 
   const traces = [];
   const layout = {
-    title: document.getElementById('titleInput').value || '',
-    xaxis: { title: document.getElementById('xlabel_0')?.value || xAxisMain, automargin: true },
-    yaxis: { title: document.getElementById('ylabel_0')?.value || displayFields[0], automargin: true },
+    title: { text: document.getElementById('titleInput').value || '', font: { size: 18, family: 'Arial', color: '#000' } },
     template: 'plotly_white',
+    xaxis: { 
+        title: { text: document.getElementById('xlabel_0')?.value || xAxisMain, font: { size: 14, color: '#000', weight: 'bold' } }, 
+        showline: true, mirror: true, linecolor: '#000', linewidth: 2, 
+        showgrid: options.grid.enabled, gridcolor: options.grid.color,
+        ticks: 'outside', tickfont: { color: '#000' }
+    },
+    yaxis: { 
+        title: { text: document.getElementById('ylabel_0')?.value || (displayFields[0] || 'Value'), font: { size: 14, color: '#000', weight: 'bold' } }, 
+        showline: true, mirror: true, linecolor: '#000', linewidth: 2, 
+        showgrid: options.grid.enabled, gridcolor: options.grid.color,
+        ticks: 'outside', tickfont: { color: '#000' }
+    },
+    margin: { l: 80, r: 80, t: 80, b: 80 },
     showlegend: document.getElementById('legendShow').checked,
-    grid: { rows: 1, columns: 1, pattern: 'independent' }
+    legend: { bordercolor: '#000', borderwidth: 1, bgcolor: 'rgba(255,255,255,0)' }
   };
 
   displayFields.forEach((ycol, idx) => {
     const currentX = (idx > 0 && xAxisSub) ? xAxisSub : xAxisMain;
     
-    // 데이터 매칭 수정: Row 단위로 x, y를 직접 매핑
+    // [데이터 매칭 오류 해결]
     let mapped = workbookData.map(row => ({
       x: row[currentX],
       y: row[ycol]
     })).filter(d => d.x !== null && d.y !== null);
 
-    // X축 기준 정렬 (데이터 매칭 꼬임 방지 핵심)
+    // [정렬] X축 기준 정렬 (논문 그래프의 기본)
     if (mapped.length > 0 && !isNaN(mapped[0].x)) {
       mapped.sort((a, b) => Number(a.x) - Number(b.x));
     }
 
-    const seriesOpt = options.series[ycol] || { color: '#1f77b4', linewidth: 2, markersize: 6, show_line: true, show_marker: true };
+    const seriesOpt = options.series[ycol] || { color: '#000000', linewidth: 2, markersize: 7, show_line: true, show_marker: true };
     
     const trace = {
       x: mapped.map(d => d.x),
@@ -113,36 +126,37 @@ btnPlot.addEventListener('click', () => {
       name: ycol,
       mode: (seriesOpt.show_line ? 'lines' : '') + (seriesOpt.show_marker ? '+markers' : ''),
       line: { color: seriesOpt.color, width: seriesOpt.linewidth, dash: seriesOpt.linestyle },
-      marker: { color: seriesOpt.color, size: seriesOpt.markersize, symbol: seriesOpt.marker },
+      marker: { color: seriesOpt.color, size: seriesOpt.markersize, symbol: seriesOpt.marker, line: { color: '#000', width: 1 } },
       type: document.getElementById('chartType').value
     };
 
-    // 보조 Y축 설정
+    // 주축/보조축 할당 로직
     if (yAxisSub && ycol === yAxisSub) {
       trace.yaxis = 'y2';
-      layout.yaxis2 = { title: yAxisSub, overlaying: 'y', side: 'right', automargin: true };
+      layout.yaxis2 = { 
+        title: { text: yAxisSub, font: { size: 14, color: '#000' } }, 
+        overlaying: 'y', side: 'right', showline: true, linecolor: '#000', linewidth: 2, ticks: 'outside' 
+      };
     }
 
     traces.push(trace);
   });
 
-  // 기타 레이아웃 옵션 적용
   if (options.axis.xlog) layout.xaxis.type = 'log';
   if (options.axis.yinvert) layout.yaxis.autorange = 'reversed';
-  if (options.grid.enabled) {
-    layout.xaxis.showgrid = true; layout.xaxis.gridcolor = options.grid.color;
-    layout.yaxis.showgrid = true; layout.yaxis.gridcolor = options.grid.color;
-  }
 
   const width = document.getElementById('chartWidth').value;
-  const height = document.getElementById('chartHeight').value || 500;
+  const height = document.getElementById('chartHeight').value || 550;
   if (width) layout.width = width;
   layout.height = height;
 
-  Plotly.newPlot('previewArea', traces, layout, { responsive: true });
+  previewArea.innerHTML = '';
+  Plotly.newPlot(previewArea, traces, layout, { 
+    responsive: true, 
+    toImageButtonOptions: { format: 'png', filename: 'research_graph', height: height, width: width || 800, scale: 2 } 
+  });
 });
 
-// UI 설정 수집용 함수
 function collectOptionsFromUI() {
   const series = {};
   document.querySelectorAll('.series-control').forEach(sc => {
@@ -168,22 +182,32 @@ function renderSeriesControls() {
   const container = document.getElementById('seriesControls');
   const checked = Array.from(document.querySelectorAll('input[name="displayField"]:checked'));
   container.innerHTML = '';
+  
+  // 논문용 마커 배열 (검은색 스타일에서 구분용)
+  const markers = ['circle', 'square', 'triangle-up', 'diamond', 'cross'];
+
   checked.forEach((cb, i) => {
     const name = cb.value;
     const div = document.createElement('div');
-    div.className = 'series-control p-2 border rounded bg-white';
+    div.className = 'series-control p-3 border rounded-md bg-white shadow-sm';
     div.dataset.name = name;
     div.innerHTML = `
-      <div class="font-bold text-xs mb-1 border-b">${name}</div>
-      <div class="grid grid-cols-2 gap-1 text-[10px]">
-        <label>색상 <input type="color" class="series-color w-full h-4" value="${['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'][i % 4]}" /></label>
-        <label>마커 <select class="series-marker w-full border"><option value="circle">●</option><option value="square">■</option></select></label>
-        <label>두께 <input type="number" class="series-linewidth w-full border" value="2" /></label>
-        <label>크기 <input type="number" class="series-markersize w-full border" value="6" /></label>
-        <label class="col-span-2">스타일 <select class="series-linestyle w-full border"><option value="solid">실선</option><option value="dash">파선</option></select></label>
-        <div class="flex gap-2 mt-1">
-          <label><input type="checkbox" class="series-showline" checked /> 선</label>
-          <label><input type="checkbox" class="series-showmarker" checked /> 표식</label>
+      <div class="font-bold text-xs mb-2 border-b pb-1 text-gray-600 truncate">${name}</div>
+      <div class="space-y-2 text-[10px]">
+        <div class="flex justify-between items-center"><span>색상</span><input type="color" class="series-color w-12 h-5" value="#000000" /></div>
+        <div class="flex justify-between items-center"><span>마커</span>
+            <select class="series-marker border px-1">
+                ${markers.map(m => `<option value="${m}" ${markers[i%markers.length]===m?'selected':''}>${m}</option>`).join('')}
+            </select>
+        </div>
+        <div class="flex justify-between items-center"><span>선두께</span><input type="number" class="series-linewidth w-12 border px-1" value="2" /></div>
+        <div class="flex justify-between items-center"><span>마커크기</span><input type="number" class="series-markersize w-12 border px-1" value="7" /></div>
+        <div class="flex justify-between items-center"><span>스타일</span>
+            <select class="series-linestyle border px-1"><option value="solid">Solid</option><option value="dash">Dash</option><option value="dot">Dot</option></select>
+        </div>
+        <div class="flex gap-4 mt-2 pt-2 border-t">
+          <label class="flex items-center gap-1"><input type="checkbox" class="series-showline" checked /> 선</label>
+          <label class="flex items-center gap-1"><input type="checkbox" class="series-showmarker" checked /> 표식</label>
         </div>
       </div>`;
     container.appendChild(div);
@@ -195,10 +219,10 @@ function updateAxisLabelUI(x_fields, y_fields) {
   const yCon = document.getElementById('ylabels-container');
   xCon.innerHTML = ''; yCon.innerHTML = '';
   x_fields.forEach((f, i) => {
-    xCon.innerHTML += `<label class="block text-xs mt-1">X축 ${i+1} (${f})</label><input id="xlabel_${i}" class="border p-1 rounded w-full text-sm" value="${f}" />`;
+    xCon.innerHTML += `<div class="mt-1"><label class="text-xs font-bold text-gray-500">X축 ${i+1} 라벨</label><input id="xlabel_${i}" class="border p-2 rounded w-full text-sm" value="${f}" /></div>`;
   });
-  y_fields.forEach((f, i) => {
-    yCon.innerHTML += `<label class="block text-xs mt-1">Y축 ${i+1} (${f})</label><input id="ylabel_${i}" class="border p-1 rounded w-full text-sm" value="${f}" />`;
+  y_fields.slice(0,1).forEach((f, i) => {
+    yCon.innerHTML += `<div class="mt-1"><label class="text-xs font-bold text-gray-500">Y축 라벨</label><input id="ylabel_${i}" class="border p-2 rounded w-full text-sm" value="${f}" /></div>`;
   });
 }
 
