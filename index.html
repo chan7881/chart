@@ -2,188 +2,40 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>엑셀 차트 변환기 (수정본)</title>
+  <title>엑셀 차트 변환기 (수정 완료)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.plot.ly/plotly-2.25.2.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.min.js"></script>
-  <style>
-    html,body{height:100%}
-    .dark-mode{background:#0b1220;color:#e6eef6}
-    .card{border:1px solid #ddd;border-radius:0.5rem;padding:1rem;box-shadow:0 1px 3px rgba(0,0,0,0.1)}
-    .dark-mode .card{background:#1f2937;border-color:#374151}
-    .card-header{font-weight:600;margin-bottom:0.75rem;display:flex;justify-content:space-between;align-items:center}
-    .collapsible-section{margin-bottom:1rem}
-  </style>
 </head>
-<body class="bg-gray-50 text-gray-800" id="bodyRoot">
-  <div class="max-w-6xl mx-auto p-6">
-    <div class="flex items-center justify-between mb-4">
-      <h1 class="text-2xl font-bold">엑셀 차트 변환기</h1>
-    </div>
-
-    <div class="border rounded bg-white p-4">
-      <div class="mb-4 border-b">
-        <button id="tab-upload" class="px-4 py-2 bg-blue-500 text-white rounded-t mr-1">자료 수집</button>
-        <button id="tab-edit" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-t">차트 수정</button>
+<body class="bg-gray-50 p-6">
+  <div class="max-w-6xl mx-auto bg-white p-6 rounded shadow">
+    <h1 class="text-2xl font-bold mb-4">엑셀 차트 변환기</h1>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <div class="p-4 border rounded bg-blue-50">
+        <label class="block font-bold mb-2">1. 파일 업로드</label>
+        <input id="fileInput" type="file" accept=".xlsx,.xls" class="w-full text-sm mb-2" />
+        <button id="btnLoad" class="bg-blue-600 text-white px-4 py-2 rounded">데이터 로드</button>
       </div>
-
-      <div id="panel-upload">
-        <label class="block mb-2 font-medium">엑셀 파일 업로드</label>
-        <input id="fileInput" type="file" accept=".xlsx,.xls" class="mb-3 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
-        <div class="mb-3">
-          <button id="btnLoad" class="px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition">파일 로드</button>
-        </div>
-
-        <div class="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div class="border p-3 rounded bg-gray-50">
-            <label class="block text-sm font-bold mb-2 text-blue-700">X축 선택</label>
-            <div class="mb-2">
-              <label class="block text-xs text-gray-600 mb-1">주축 (Bottom)</label>
-              <select id="xAxisMain" class="border p-2 rounded w-full text-sm bg-white"><option value="">선택 안함</option></select>
-            </div>
-            <div>
-              <label class="block text-xs text-gray-600 mb-1">보조축 (Top)</label>
-              <select id="xAxisSub" class="border p-2 rounded w-full text-sm bg-white"><option value="">선택 안함</option></select>
-            </div>
-          </div>
-          <div class="border p-3 rounded bg-gray-50">
-            <label class="block text-sm font-bold mb-2 text-green-700">Y축 데이터 (표시할 값의 기준)</label>
-            <div class="mb-2">
-              <label class="block text-xs text-gray-600 mb-1">주축 (Left)</label>
-              <select id="yAxisMain" class="border p-2 rounded w-full text-sm bg-white"><option value="">선택 안함</option></select>
-            </div>
-            <div>
-              <label class="block text-xs text-gray-600 mb-1">보조축 (Right)</label>
-              <select id="yAxisSub" class="border p-2 rounded w-full text-sm bg-white"><option value="">선택 안함</option></select>
-            </div>
-          </div>
-        </div>
-
-        <div class="mt-4">
-          <label class="block text-sm font-medium mb-2">데이터 선택 (Y값으로 사용할 항목들을 체크하세요)</label>
-          <div id="columnsArea" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 p-3 border rounded bg-white"></div>
-        </div>
-
-        <div class="mt-4 flex gap-4 items-end">
-          <div class="flex-1">
-            <label class="block font-medium text-sm mb-1">차트 유형</label>
-            <select id="chartType" class="border p-2 rounded w-full">
-              <option value="scatter">분산형 (기본)</option>
-              <option value="line">선형</option>
-              <option value="bar">막대형</option>
-            </select>
-          </div>
-          <button id="btnPlot" class="px-6 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 transition">차트 생성</button>
-        </div>
-      </div>
-
-      <div id="panel-edit" class="hidden">
-        <h2 class="font-semibold mb-4 text-lg">차트 세부 설정</h2>
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div class="card collapsible-section">
-            <div class="card-header"><span>축 설정</span><input id="show-axis" type="checkbox" checked /></div>
-            <div id="axis-content">
-              <label class="block text-sm mb-1">차트 제목</label>
-              <input id="titleInput" class="border p-1 rounded w-full mb-2 text-sm" />
-              <div id="xlabels-container" class="mb-2"></div>
-              <div id="ylabels-container" class="border-t pt-2"></div>
-              <div class="grid grid-cols-2 gap-2 mt-2">
-                <div>
-                  <label class="block text-xs">X축 범위 (시작,끝)</label>
-                  <input id="xlimInput" class="border p-1 rounded w-full text-sm" placeholder="0,100" />
-                </div>
-                <div>
-                  <label class="block text-xs">Y축 범위 (시작,끝)</label>
-                  <input id="ylimInput" class="border p-1 rounded w-full text-sm" placeholder="0,100" />
-                </div>
-              </div>
-              <div class="mt-2 flex gap-4">
-                <label class="inline-flex items-center text-xs"><input id="xlog" type="checkbox" class="mr-1"/> X축 로그</label>
-                <label class="inline-flex items-center text-xs"><input id="yinvert" type="checkbox" class="mr-1"/> Y축 반전</label>
-              </div>
-            </div>
-          </div>
-
-          <div class="card collapsible-section">
-            <div class="card-header"><span>눈금선 / 범례</span><input id="show-grid" type="checkbox" checked /></div>
-            <div id="grid-content">
-              <label class="inline-flex items-center text-sm mb-2"><input id="gridToggle" type="checkbox" class="mr-2" checked/> 눈금선 표시</label>
-              <div class="grid grid-cols-2 gap-2">
-                <div>
-                  <label class="block text-xs">색상</label>
-                  <input id="gridColor" type="color" value="#e5e5e5" class="w-full h-8" />
-                </div>
-                <div>
-                  <label class="block text-xs">투명도</label>
-                  <input id="gridAlpha" type="range" min="0" max="1" step="0.1" value="1" class="w-full" />
-                </div>
-              </div>
-              <div class="mt-2">
-                <label class="block text-xs">범례 위치</label>
-                <select id="legendPos" class="border p-1 rounded w-full text-sm">
-                  <option value="top right">우측 상단</option>
-                  <option value="top left">좌측 상단</option>
-                  <option value="outside">차트 외부</option>
-                </select>
-                <label class="inline-flex items-center text-xs mt-1"><input id="legendShow" type="checkbox" class="mr-1" checked/> 범례 표시</label>
-              </div>
-            </div>
-          </div>
-
-          <div class="card collapsible-section">
-            <div class="card-header"><span>추세선</span><input id="show-trendline" type="checkbox" /></div>
-            <div id="trendline-content" style="display:none">
-              <label class="inline-flex items-center text-sm"><input id="trendEnabled" type="checkbox" class="mr-2"/> 활성화</label>
-              <select id="trendType" class="border p-1 rounded w-full text-sm mt-1">
-                <option value="linear">선형 (y = ax + b)</option>
-                <option value="poly">다항식 (Polynomial)</option>
-              </select>
-              <input id="trendDegree" type="number" class="border p-1 rounded w-full text-sm mt-1" value="2" placeholder="다항식 차수" />
-              <label class="inline-flex items-center text-xs mt-1"><input id="trendShowEq" type="checkbox" class="mr-1"/> 수식 표시</label>
-              <div class="grid grid-cols-2 gap-2 mt-1">
-                <input id="trendColor" type="color" value="#ff0000" class="w-full h-8" />
-                <input id="trendWidth" type="number" step="0.5" value="1.5" class="border p-1 rounded w-full text-sm" />
-              </div>
-            </div>
-          </div>
-
-          <div class="card collapsible-section">
-            <div class="card-header"><span>데이터 레이블</span><input id="show-datalabels" type="checkbox" /></div>
-            <div id="datalabels-content" style="display:none">
-              <label class="inline-flex items-center text-sm"><input id="datalabelsEnabled" type="checkbox" class="mr-2"/> 값 표시</label>
-              <input id="datalabelsDecimals" type="number" value="1" min="0" class="border p-1 rounded w-full text-sm mt-1" />
-            </div>
-          </div>
-
-          <div class="card collapsible-section lg:col-span-2">
-            <div class="card-header"><span>데이터 계열 서식 (데이터별 색상/마커 설정)</span><input id="show-series" type="checkbox" checked /></div>
-            <div id="seriesControls" class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm"></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="mt-4 flex flex-wrap gap-4 items-end bg-gray-100 p-3 rounded">
-        <div>
-          <label class="block text-xs font-medium">너비 (px)</label>
-          <input id="chartWidth" type="number" placeholder="자동" class="border p-1 rounded w-24 text-sm" />
-        </div>
-        <div>
-          <label class="block text-xs font-medium">높이 (px)</label>
-          <input id="chartHeight" type="number" placeholder="480" class="border p-1 rounded w-24 text-sm" />
-        </div>
-        <button id="btnUpdatePreview" class="px-5 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 shadow-sm transition">설정 적용 및 다시 그리기</button>
-      </div>
-
-      <div class="mt-4">
-        <h3 class="font-bold mb-2 flex items-center gap-2"><span class="w-2 h-2 bg-blue-600 rounded-full"></span> 차트 미리보기</h3>
-        <div id="previewArea" class="p-2 bg-white border rounded shadow-inner min-h-[500px] flex justify-center items-center">
-          <p class="text-gray-400">데이터를 로드하고 '차트 생성'을 눌러주세요.</p>
+      <div class="p-4 border rounded bg-green-50">
+        <label class="block font-bold mb-2">2. 축 및 데이터 선택</label>
+        <div class="grid grid-cols-2 gap-2">
+          <select id="xAxisMain" class="border p-1 text-sm"><option value="">X축 선택</option></select>
+          <select id="yAxisMain" class="border p-1 text-sm"><option value="">Y축(주) 선택</option></select>
         </div>
       </div>
     </div>
+
+    <div id="columnsArea" class="grid grid-cols-3 gap-2 mb-4 border p-4 rounded max-h-40 overflow-y-auto"></div>
+
+    <div class="flex gap-2 mb-6">
+      <button id="btnPlot" class="bg-indigo-600 text-white px-6 py-2 rounded font-bold">차트 생성 / 갱신</button>
+    </div>
+
+    <div id="previewArea" class="border rounded min-h-[500px]"></div>
   </div>
+
   <script src="app.js"></script>
 </body>
 </html>
