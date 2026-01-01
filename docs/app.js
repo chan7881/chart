@@ -1,4 +1,4 @@
-// docs/app.js: frontend-only Excel -> Plotly pipeline
+// app.js: 엑셀 데이터를 시각화하는 핵심 로직 (정렬 및 매칭 버그 수정판)
 
 const fileInput = document.getElementById('fileInput');
 const btnLoad = document.getElementById('btnLoad');
@@ -11,461 +11,282 @@ const panelUpload = document.getElementById('panel-upload');
 const panelEdit = document.getElementById('panel-edit');
 const btnUpdate = document.getElementById('btnUpdatePreview');
 
-// state: track swapped columns
-let isSwapped = false;
-let selectedYFields = []; // track Y fields for multi-label support
-
-tabUpload.addEventListener('click', ()=>{panelUpload.classList.remove('hidden');panelEdit.classList.add('hidden');tabUpload.classList.add('bg-blue-500');tabEdit.classList.remove('bg-blue-500');});
-tabEdit.addEventListener('click', ()=>{panelUpload.classList.add('hidden');panelEdit.classList.remove('hidden');tabEdit.classList.add('bg-blue-500');tabUpload.classList.remove('bg-blue-500');});
-
-let workbookData = null; // array of objects
+let workbookData = null; 
 let columns = [];
+let selectedYFields = [];
 
-btnLoad.addEventListener('click', ()=>{
+// 탭 전환 로직
+tabUpload.addEventListener('click', () => {
+  panelUpload.classList.remove('hidden'); panelEdit.classList.add('hidden');
+  tabUpload.className = "px-4 py-2 bg-blue-500 text-white rounded-t mr-1";
+  tabEdit.className = "px-4 py-2 bg-gray-200 text-gray-700 rounded-t";
+});
+tabEdit.addEventListener('click', () => {
+  panelUpload.classList.add('hidden'); panelEdit.classList.remove('hidden');
+  tabEdit.className = "px-4 py-2 bg-blue-500 text-white rounded-t";
+  tabUpload.className = "px-4 py-2 bg-gray-200 text-gray-700 rounded-t";
+});
+
+// 엑셀 로드
+btnLoad.addEventListener('click', () => {
   if (!fileInput.files.length) return alert('엑셀 파일을 선택하세요');
   const f = fileInput.files[0];
   const reader = new FileReader();
-  reader.onload = (e)=>{
+  reader.onload = (e) => {
     const data = new Uint8Array(e.target.result);
-    const wb = XLSX.read(data, {type:'array'});
+    const wb = XLSX.read(data, { type: 'array' });
     const first = wb.SheetNames[0];
     const ws = wb.Sheets[first];
-    const aoa = XLSX.utils.sheet_to_json(ws, {defval: null});
-    workbookData = aoa; // array of row objects
-    columns = Object.keys(aoa[0]||{});
+    const aoa = XLSX.utils.sheet_to_json(ws, { defval: null });
+    
+    if (aoa.length === 0) return alert('데이터가 없는 시트입니다.');
+    
+    workbookData = aoa; 
+    columns = Object.keys(aoa[0] || {});
     renderColumns(columns);
-    alert('파일 로드 완료: '+first + ' 시트, 행수: ' + aoa.length);
+    alert(`파일 로드 완료: ${first} 시트 (${aoa.length}행)`);
   };
   reader.readAsArrayBuffer(f);
 });
 
-function renderColumns(cols){
-  // Populate axis dropdowns
-  const xAxisMainSel = document.getElementById('xAxisMain');
-  const xAxisSubSel = document.getElementById('xAxisSub');
-  const yAxisMainSel = document.getElementById('yAxisMain');
-  const yAxisSubSel = document.getElementById('yAxisSub');
-  
-  // Store current selections
-  const xMainVal = xAxisMainSel.value;
-  const xSubVal = xAxisSubSel.value;
-  const yMainVal = yAxisMainSel.value;
-  const ySubVal = yAxisSubSel.value;
-  
-  // Clear and rebuild dropdowns (keep first option "선택 안함")
-  [xAxisMainSel, xAxisSubSel, yAxisMainSel, yAxisSubSel].forEach(sel => {
-    while(sel.children.length > 1) sel.removeChild(sel.lastChild);
+function renderColumns(cols) {
+  const selects = ['xAxisMain', 'xAxisSub', 'yAxisMain', 'yAxisSub'].map(id => document.getElementById(id));
+  selects.forEach(sel => {
+    const current = sel.value;
+    sel.innerHTML = '<option value="">선택 안함</option>';
+    cols.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c; opt.textContent = c;
+      sel.appendChild(opt);
+    });
+    if (cols.includes(current)) sel.value = current;
   });
-  
-  cols.forEach(c => {
-    const opt1 = document.createElement('option'); opt1.value = c; opt1.textContent = c;
-    const opt2 = document.createElement('option'); opt2.value = c; opt2.textContent = c;
-    const opt3 = document.createElement('option'); opt3.value = c; opt3.textContent = c;
-    const opt4 = document.createElement('option'); opt4.value = c; opt4.textContent = c;
-    xAxisMainSel.appendChild(opt1);
-    xAxisSubSel.appendChild(opt2);
-    yAxisMainSel.appendChild(opt3);
-    yAxisSubSel.appendChild(opt4);
-  });
-  
-  // Restore previous selections if they still exist
-  if(cols.includes(xMainVal)) xAxisMainSel.value = xMainVal;
-  if(cols.includes(xSubVal)) xAxisSubSel.value = xSubVal;
-  if(cols.includes(yMainVal)) yAxisMainSel.value = yMainVal;
-  if(cols.includes(ySubVal)) yAxisSubSel.value = ySubVal;
-  
-  // Render checkboxes for displaying values
+
   columnsArea.innerHTML = '';
-  const left = document.createElement('div');
-  const right = document.createElement('div');
-  cols.forEach((c,i)=>{
-    const el = document.createElement('div');
-    el.className = 'p-2';
-    el.innerHTML = `
-      <label class="text-sm inline-flex items-center">
-        <input type="checkbox" name="displayField" value="${c}" class="mr-2" />
-        ${c}
-      </label>
-    `;
-    if (i % 2 === 0) left.appendChild(el); else right.appendChild(el);
+  cols.forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'flex items-center gap-2 p-1 hover:bg-gray-50';
+    div.innerHTML = `<input type="checkbox" name="displayField" value="${c}" id="chk_${c}" class="w-4 h-4" />
+                     <label for="chk_${c}" class="text-sm truncate cursor-pointer">${c}</label>`;
+    columnsArea.appendChild(div);
   });
-  columnsArea.appendChild(left);
-  columnsArea.appendChild(right);
-  attachSeriesSettingsListeners();
-}
-
-// pivot/groupby & aggregation (mean)
-function pivotAndAggregate(data, groupCols, aggCols){
-  if (!groupCols.length) return data.map(r=>({__index: data.indexOf(r), ...r}));
-  const map = new Map();
-  data.forEach(row=>{
-    const key = groupCols.map(c=>String(row[c])).join('||');
-    if (!map.has(key)) map.set(key, {count:0});
-    const entry = map.get(key);
-    groupCols.forEach(c=> entry[c]=row[c]);
-    aggCols.forEach(c=>{ entry[c] = (entry[c]||0) + (row[c] == null ? 0 : Number(row[c])); });
-    entry.count += 1;
-  });
-  const out = [];
-  map.forEach(v=>{
-    const obj = {};
-    groupCols.forEach(c=>obj[c]=v[c]);
-    aggCols.forEach(c=> obj[c] = v.count ? (v[c]/v.count) : null );
-    out.push(obj);
-  });
-  return out;
-}
-
-// simple polyfit using math.js
-function polyfit(x, y, degree){
-  const n = x.length;
-  const V = [];
-  for (let i=0;i<n;i++){
-    const row = [];
-    for (let j=0;j<=degree;j++) row.push(Math.pow(x[i], j));
-    V.push(row);
-  }
-  const VT = math.transpose(V);
-  const VTV = math.multiply(VT, V);
-  const inv = math.inv(VTV);
-  const VTy = math.multiply(VT, y);
-  const coeffs = math.multiply(inv, VTy); // vector
-  return coeffs; // array of coefficients [a0, a1, ...]
-}
-
-function polyval(coeffs, x){
-  return x.map(xx=> coeffs.reduce((s,c,i)=> s + c * Math.pow(xx,i), 0));
-}
-
-btnPlot.addEventListener('click', async ()=>{
-  if (!workbookData) return alert('먼저 파일을 로드하세요');
   
-  // Get axis selections from dropdowns
+  // 체크박스 변경 시 계열 설정 UI 갱신
+  document.querySelectorAll('input[name="displayField"]').forEach(cb => {
+    cb.addEventListener('change', renderSeriesControls);
+  });
+}
+
+btnPlot.addEventListener('click', async () => {
+  if (!workbookData) return alert('먼저 파일을 로드하세요');
+
   const xAxisMain = document.getElementById('xAxisMain').value;
   const xAxisSub = document.getElementById('xAxisSub').value;
   const yAxisMain = document.getElementById('yAxisMain').value;
   const yAxisSub = document.getElementById('yAxisSub').value;
-  
-  // Get values to display from checkboxes
-  const displayChecks = Array.from(document.querySelectorAll('input[name="displayField"]:checked'));
-  const displayFields = displayChecks.map(i => i.value);
-  
-  if (!xAxisMain && !xAxisSub) return alert('X축을 최소 1개 선택하세요');
-  if (!yAxisMain && !yAxisSub) return alert('Y축을 최소 1개 선택하세요');
-  if (displayFields.length === 0) return alert('표시할 값을 최소 1개 선택하세요');
-  
-  // Collect all X axes and Y axes
-  const x_axes = [];
-  if (xAxisMain) x_axes.push(xAxisMain);
-  if (xAxisSub) x_axes.push(xAxisSub);
-  const y_axes = [];
-  if (yAxisMain) y_axes.push(yAxisMain);
-  if (yAxisSub) y_axes.push(yAxisSub);
-  
-  selectedYFields = displayFields; // store for label UI
-  const chartType = document.getElementById('chartType').value;
+  const displayFields = Array.from(document.querySelectorAll('input[name="displayField"]:checked')).map(i => i.value);
 
-  // Create pivot datasets: one for each displayField, using corresponding X axis
-  const plot_dfs = [];
-  displayFields.forEach((col, idx) => {
-    const xAxisForThisField = x_axes[Math.min(idx, x_axes.length - 1)];
-    const aggregated = pivotAndAggregate(workbookData, [xAxisForThisField], [col]);
-    plot_dfs.push({ axis: xAxisForThisField, data: aggregated });
-  });
-
-  // Update Y-axis and X-axis label UI based on actual axis selections
-  updateYAxisLabelUI(y_axes);
-  updateXAxisLabelUI(x_axes);
-
-  // build traces
-  const traces = [];
-  const layout = {
-    title: {text: document.getElementById('titleInput').value || '', font:{size:14, family:'Arial, sans-serif', color:'#000'}},
-    xaxis:{title: {text: document.getElementById('xlabel_0')?.value || (x_axes[0]||''), font:{size:12, color:'#000'}}, showgrid:false, zeroline:false, showline:true, linewidth:1.5, linecolor:'#000', mirror:true},
-    yaxis:{title: {text: document.getElementById('ylabel_0')?.value || document.getElementById('ylabelInput').value || (y_axes[0]||''), font:{size:12, color:'#000'}}, showgrid:false, zeroline:false, showline:true, linewidth:1.5, linecolor:'#000', mirror:true},
-    template:'plotly_white',
-    font:{family:'Arial, sans-serif', size:11, color:'#000'},
-    margin:{l:60, r:40, t:50, b:50},
-    hovermode:'closest'
-  };
+  if (!xAxisMain && !xAxisSub) return alert('최소 하나의 X축을 선택해야 합니다.');
+  if (displayFields.length === 0) return alert('표시할 값을 최소 하나 선택하세요.');
 
   const options = collectOptionsFromUI();
+  updateAxisLabelUI([xAxisMain, xAxisSub].filter(Boolean), [yAxisMain, yAxisSub].filter(Boolean));
 
-  // Only plot selected display fields
-  displayFields.forEach((ycol, idx)=>{
-    const plotInfo = plot_dfs[idx] || plot_dfs[0];
-    const plot_df = plotInfo.data;
-    const xAxis = plotInfo.axis;
+  const traces = [];
+  const layout = {
+    title: { text: document.getElementById('titleInput').value || '', font: { size: 16 } },
+    template: 'plotly_white',
+    xaxis: { title: { text: document.getElementById('xlabel_0')?.value || xAxisMain }, showline: true, mirror: true, linecolor: '#333' },
+    yaxis: { title: { text: document.getElementById('ylabel_0')?.value || yAxisMain }, showline: true, mirror: true, linecolor: '#333' },
+    margin: { l: 60, r: 60, t: 60, b: 60 },
+    hovermode: 'closest',
+    showlegend: document.getElementById('legendShow').checked
+  };
+
+  displayFields.forEach((ycol, idx) => {
+    // [버그 수정]: X축과 Y축 데이터의 1:1 매칭 보장
+    const currentXAxis = (idx > 0 && xAxisSub) ? xAxisSub : xAxisMain;
     
-    const xvals = plot_df.map(r=>r[xAxis]);
-    const yvals = plot_df.map(r=>Number(r[ycol]));
-    const color = options.series[ycol]?.color || '#000000'; // Default to black
+    // 데이터 추출 및 정렬 (선이 꼬이는 문제 해결)
+    let traceData = workbookData.map(row => ({
+      x: row[currentXAxis],
+      y: row[ycol]
+    })).filter(d => d.x !== null && d.y !== null);
+
+    // X값이 숫자라면 오름차순 정렬
+    if (traceData.length > 0 && !isNaN(traceData[0].x)) {
+      traceData.sort((a, b) => a.x - b.x);
+    }
+
+    const xvals = traceData.map(d => d.x);
+    const yvals = traceData.map(d => Number(d.y));
+    const seriesOpt = options.series[ycol] || { color: '#000000', linewidth: 2, markersize: 6, show_line: true, show_marker: true };
+
     const trace = {
       x: xvals,
       y: yvals,
       name: ycol,
-      mode: (options.series[ycol]?.show_line ? 'lines' : '') + (options.series[ycol]?.show_marker ? '+markers' : ''),
-      marker: {color: color, size: options.series[ycol]?.markersize || 6, opacity: 1.0, symbol: options.series[ycol]?.marker || 'circle'},
-      line: {color: color, width: options.series[ycol]?.linewidth || 2, dash: options.series[ycol]?.linestyle || 'solid'},
+      mode: (seriesOpt.show_line ? 'lines' : '') + (seriesOpt.show_marker ? (seriesOpt.show_line ? '+markers' : 'markers') : ''),
+      line: { color: seriesOpt.color, width: seriesOpt.linewidth, dash: seriesOpt.linestyle },
+      marker: { color: seriesOpt.color, size: seriesOpt.markersize, symbol: seriesOpt.marker },
+      type: document.getElementById('chartType').value === 'bar' ? 'bar' : 'scatter'
     };
-    // errorbars removed
 
-    // dual axis: second trace uses either xaxis2 or yaxis2 depending on selections
-    if (idx===1 && options.dual_axis){
-      if (xAxisSub){
-        // If X sub-axis selected, use xaxis2 for second trace
-        trace.xaxis = 'x2';
-      } else if (yAxisSub){
-        // If Y sub-axis selected, use yaxis2 for second trace
-        trace.yaxis = 'y2';
-      }
+    // 보조축 설정
+    if (idx > 0 && (xAxisSub || yAxisSub)) {
+      if (xAxisSub) { trace.xaxis = 'x2'; layout.xaxis2 = { overlaying: 'x', side: 'top', title: { text: document.getElementById('xlabel_1')?.value || xAxisSub } }; }
+      if (yAxisSub) { trace.yaxis = 'y2'; layout.yaxis2 = { overlaying: 'y', side: 'right', title: { text: document.getElementById('ylabel_1')?.value || yAxisSub } }; }
     }
 
     traces.push(trace);
 
-    // trendline
-    if (options.trendline.enabled){
-      if (options.trendline.type==='linear'){
-        // linear fit
+    // 추세선 로직
+    if (options.trendline.enabled && xvals.length > 1) {
+      try {
         const xv = xvals.map(Number);
         const yv = yvals.map(Number);
-        const xmean = xv.reduce((a,b)=>a+b,0)/xv.length;
-        const ymean = yv.reduce((a,b)=>a+b,0)/yv.length;
-        let num=0, den=0;
-        for (let i=0;i<xv.length;i++){ num += (xv[i]-xmean)*(yv[i]-ymean); den += Math.pow(xv[i]-xmean,2); }
-        const slope = den===0?0: num/den; const intercept = ymean - slope*xmean;
-        const trendY = xv.map(xx=> intercept + slope*xx);
-        traces.push({x:xv, y:trendY, mode:'lines', name: ycol + ' 추세선', line:{dash: options.trendline.style || 'dash', width: options.trendline.width || 2, color: options.trendline.color || color}});
-        if (options.trendline.showEq){
-          const eq = `y=${slope.toFixed(3)}x+${intercept.toFixed(3)}`;
-          layout.annotations = (layout.annotations||[]).concat([{x: xv[Math.floor(xv.length/2)], y: trendY[Math.floor(trendY.length/2)], text: eq, showarrow:false}]);
+        let trendY = [];
+        if (options.trendline.type === 'linear') {
+          const { slope, intercept } = calculateLinearRegression(xv, yv);
+          trendY = xv.map(x => slope * x + intercept);
+        } else {
+          const coeffs = polyfit(xv, yv, options.trendline.degree);
+          trendY = polyval(coeffs, xv);
         }
-      } else if (options.trendline.type==='poly'){
-        const deg = Math.max(1, parseInt(options.trendline.degree||2,10));
-        const xv = xvals.map(Number); const yv = yvals.map(Number);
-        try{
-          const coeffs = polyfit(xv, yv, deg); // math.js vector
-          const coeffsArr = coeffs.map(c=>c);
-          const trendY = polyval(coeffsArr, xv);
-          traces.push({x:xv, y:trendY, mode:'lines', name: ycol + ' 추세선', line:{dash: options.trendline.style || 'dash', width: options.trendline.width || 2, color: options.trendline.color || color}});
-          if (options.trendline.showEq){
-            const eq = coeffsArr.map((c,i)=> `${c.toFixed(3)}x^${i}` ).join(' + ');
-            layout.annotations = (layout.annotations||[]).concat([{x: xv[Math.floor(xv.length/2)], y: trendY[Math.floor(trendY.length/2)], text: eq, showarrow:false, font:{size:10}}]);
-          }
-        }catch(e){ console.warn('polyfit 실패', e); }
-      }
+        traces.push({
+          x: xvals, y: trendY, mode: 'lines', name: `${ycol} 추세`,
+          line: { color: options.trendline.color, width: options.trendline.width, dash: 'dash' },
+          showlegend: false
+        });
+      } catch (e) { console.warn("Trendline error", e); }
     }
-
-    // data labels
-    if (options.datalabels.enabled){
-      const labels = yvals.map(v=> (Number(v).toFixed(options.datalabels.decimals||0)) );
-      trace.text = labels; trace.textposition = 'top center';
-    }
-
   });
 
-  // grid
-  if (options.grid.enabled){
-    layout.xaxis.showgrid = true;
-    layout.xaxis.gridcolor = options.grid.color;
-    layout.xaxis.gridwidth = 1;
-    layout.yaxis.showgrid = true;
-    layout.yaxis.gridcolor = options.grid.color;
-    layout.yaxis.gridwidth = 1;
+  // 기타 레이아웃 설정 (로그, 범위 등)
+  if (options.axis.xlim) layout.xaxis.range = options.axis.xlim;
+  if (options.axis.ylim) layout.yaxis.range = options.axis.ylim;
+  if (options.axis.xlog) layout.xaxis.type = 'log';
+  if (options.axis.yinvert) layout.yaxis.autorange = 'reversed';
+  if (options.grid.enabled) {
+    layout.xaxis.showgrid = true; layout.xaxis.gridcolor = options.grid.color;
+    layout.yaxis.showgrid = true; layout.yaxis.gridcolor = options.grid.color;
+  }
+  
+  // 범례 위치
+  if (options.legend.position === 'outside') {
+    layout.legend = { x: 1.05, y: 1 };
+  } else {
+    const p = options.legend.position.split(' ');
+    layout.legend = { x: p[1] === 'right' ? 1 : 0, y: p[0] === 'top' ? 1 : 0 };
   }
 
-  // legend position
-  if (options.legend.position){
-    if (options.legend.position==='outside'){
-      layout.legend = {x:1.02, y:1, xanchor:'left'};
-    } else {
-      const mapPos = {'top right':{x:1,y:1,'xanchor':'right','yanchor':'top'}, 'top left':{x:0,y:1,'xanchor':'left','yanchor':'top'}, 'bottom left':{x:0,y:0,'xanchor':'left','yanchor':'bottom'}, 'bottom right':{x:1,y:0,'xanchor':'right','yanchor':'bottom'}};
-      layout.legend = mapPos[options.legend.position] || {};
-    }
-  }
+  const plotConfig = { responsive: true, displayModeBar: true };
+  const width = document.getElementById('chartWidth').value;
+  const height = document.getElementById('chartHeight').value || 480;
+  if (width) layout.width = width;
+  layout.height = height;
 
-  // legend visibility
-  layout.showlegend = document.getElementById('legendShow') ? document.getElementById('legendShow').checked : true;
-
-  // axis ranges and log
-  if (options.axis.xlim){ layout.xaxis.range = options.axis.xlim.map(Number); }
-  if (options.axis.ylim){ layout.yaxis.range = options.axis.ylim.map(Number); }
-  if (options.axis.xlog){ layout.xaxis.type='log'; }
-  if (options.axis.yinvert){ layout.yaxis.autorange='reversed'; }
-
-  // X axis 2 title (if second X selected)
-  if (x_axes.length > 1){
-    const x2label = document.getElementById('xlabel_1')?.value || x_axes[1] || '';
-    layout.xaxis2 = {overlaying: 'x', side: 'top', title: {text: x2label, font:{size:12, color:'#000'}}, showgrid:false, zeroline:false, showline:true, linewidth:1.5, linecolor:'#000', mirror:true};
-  }
-
-  // Y axis 2 title (if second Y selected)
-  if (y_axes.length > 1){
-    const y2label = document.getElementById('ylabel_1')?.value || y_axes[1] || '';
-    layout.yaxis2 = {overlaying: 'y', side: 'right', title: {text: y2label, font:{size:12, color:'#000'}}, showgrid:false, zeroline:false, showline:true, linewidth:1.5, linecolor:'#000', mirror:true};
-  }
-
-  // render
   previewArea.innerHTML = '';
-  const gd = document.createElement('div'); previewArea.appendChild(gd);
-  // apply optional user-specified size: set element style and Plotly layout dims
-  if (options.size && options.size.width){
-    gd.style.width = options.size.width + 'px';
-    layout.width = options.size.width;
-  } else {
-    gd.style.width = '100%';
-    if (layout.width) delete layout.width;
-  }
-  if (options.size && options.size.height){
-    gd.style.height = options.size.height + 'px';
-    layout.height = options.size.height;
-  } else {
-    gd.style.height = '480px';
-    if (layout.height) delete layout.height;
-  }
-  Plotly.newPlot(gd, traces, layout, {responsive:true, displayModeBar:false});
-
+  const gd = document.createElement('div');
+  previewArea.appendChild(gd);
+  Plotly.newPlot(gd, traces, layout, plotConfig);
 });
 
-function collectOptionsFromUI(){
-  const options = {};
-  options.xlabel = document.getElementById('xlabel_0')?.value || document.getElementById('xlabelInput')?.value || '';
-  options.ylabel = document.getElementById('ylabel_0')?.value || document.getElementById('ylabelInput')?.value || '';
-  options.axis = {};
-  // chart size (pixels) - optional
-  options.size = {};
-  const wVal = (document.getElementById('chartWidth')?.value || '').toString().trim();
-  const hVal = (document.getElementById('chartHeight')?.value || '').toString().trim();
-  if (wVal !== '') options.size.width = Number(wVal);
-  if (hVal !== '') options.size.height = Number(hVal);
-  const xlim = document.getElementById('xlimInput').value.split(',').map(s=>s.trim()).filter(Boolean);
-  if (xlim.length===2) options.axis.xlim = [Number(xlim[0]), Number(xlim[1])];
-  const ylim = document.getElementById('ylimInput').value.split(',').map(s=>s.trim()).filter(Boolean);
-  if (ylim.length===2) options.axis.ylim = [Number(ylim[0]), Number(ylim[1])];
-  options.axis.xlog = document.getElementById('xlog').checked;
-  options.axis.yinvert = document.getElementById('yinvert').checked;
+// 헬퍼 함수들
+function collectOptionsFromUI() {
+  const xlim = document.getElementById('xlimInput').value.split(',').filter(s => s.trim() !== "").map(Number);
+  const ylim = document.getElementById('ylimInput').value.split(',').filter(s => s.trim() !== "").map(Number);
   
-  // grid - only if show-grid is checked
-  const showGrid = document.getElementById('show-grid').checked;
-  options.grid = showGrid ? {enabled: document.getElementById('gridToggle').checked, color: document.getElementById('gridColor').value, alpha: Number(document.getElementById('gridAlpha').value), width:1} : {enabled:false};
-  
-  // legend
-  options.legend = {position: document.getElementById('legendPos').value};
-  
-  // errorbars removed — keep disabled to avoid missing DOM refs
-  options.errorbars = {enabled:false};
-  
-  // trendline - only if show-trendline is checked
-  const showTrend = document.getElementById('show-trendline').checked;
-  options.trendline = showTrend ? {
-    enabled: document.getElementById('trendEnabled').checked,
-    type: document.getElementById('trendType').value,
-    degree: Number(document.getElementById('trendDegree').value||2),
-    showEq: document.getElementById('trendShowEq').checked,
-    color: document.getElementById('trendColor')?.value || '#000000',
-    style: document.getElementById('trendStyle')?.value || 'dash',
-    width: Number(document.getElementById('trendWidth')?.value || 2)
-  } : {enabled:false};
-  
-  // datalabels - only if show-datalabels is checked
-  const showDl = document.getElementById('show-datalabels').checked;
-  options.datalabels = showDl ? {enabled: document.getElementById('datalabelsEnabled').checked, decimals: Number(document.getElementById('datalabelsDecimals').value||0)} : {enabled:false};
-  
-  options.dual_axis = true;
-  
-  // series - only if show-series is checked
-  options.series = {};
-  if (document.getElementById('show-series').checked){
-    const seriesControls = document.querySelectorAll('.series-control');
-    seriesControls.forEach(sc=>{
-      const name = sc.dataset.name;
-      const color = sc.querySelector('.series-color')?.value || '#000000';
-      const linewidth = Number(sc.querySelector('.series-linewidth')?.value||2);
-      const marker = sc.querySelector('.series-marker')?.value || 'circle';
-      const markersize = Number(sc.querySelector('.series-markersize')?.value||6);
-      const linestyle = sc.querySelector('.series-linestyle')?.value || 'solid';
-      const show_line = sc.querySelector('.series-showline')?.checked || false;
-      const show_marker = sc.querySelector('.series-showmarker')?.checked || false;
-      options.series[name] = {color, linewidth, marker, markersize, linestyle, show_line, show_marker};
-    });
-  }
-  return options;
+  const series = {};
+  document.querySelectorAll('.series-control').forEach(sc => {
+    const n = sc.dataset.name;
+    series[n] = {
+      color: sc.querySelector('.series-color').value,
+      linewidth: Number(sc.querySelector('.series-linewidth').value),
+      markersize: Number(sc.querySelector('.series-markersize').value),
+      marker: sc.querySelector('.series-marker').value,
+      linestyle: sc.querySelector('.series-linestyle').value,
+      show_line: sc.querySelector('.series-showline').checked,
+      show_marker: sc.querySelector('.series-showmarker').checked
+    };
+  });
+
+  return {
+    axis: { xlim: xlim.length === 2 ? xlim : null, ylim: ylim.length === 2 ? ylim : null, xlog: document.getElementById('xlog').checked, yinvert: document.getElementById('yinvert').checked },
+    grid: { enabled: document.getElementById('gridToggle').checked, color: document.getElementById('gridColor').value },
+    legend: { position: document.getElementById('legendPos').value },
+    trendline: { enabled: document.getElementById('trendEnabled').checked, type: document.getElementById('trendType').value, degree: Number(document.getElementById('trendDegree').value), color: document.getElementById('trendColor').value, width: Number(document.getElementById('trendWidth').value) },
+    series: series
+  };
 }
 
-// per-series controls
-function attachSeriesSettingsListeners(){
+function renderSeriesControls() {
   const container = document.getElementById('seriesControls');
+  const checked = Array.from(document.querySelectorAll('input[name="displayField"]:checked'));
   container.innerHTML = '';
-  const displayChecks = Array.from(document.querySelectorAll('input[name="displayField"]'));
-  displayChecks.forEach(cb=>{ cb.addEventListener('change', ()=>renderSeriesControls()); });
-  renderSeriesControls();
-}
-function renderSeriesControls(){
-  const container = document.getElementById('seriesControls'); container.innerHTML = '';
-  const displayChecks = Array.from(document.querySelectorAll('input[name="displayField"]:checked'));
-  displayChecks.forEach(cb=>{
+  checked.forEach((cb, i) => {
     const name = cb.value;
     const div = document.createElement('div');
-    div.className = 'series-control p-2 border rounded'; div.dataset.name = name;
-    div.innerHTML = `\
-      <div class="font-medium">${name}</div>\
-      <div class="grid grid-cols-2 gap-2 mt-1">\
-        <div>색 <input class="series-color" type="color" value="#000000" /></div>\
-        <div>선너비 <input class="series-linewidth" type="number" step="0.1" value="2" /></div>\
-        <div>마커 <input class="series-marker" value="circle" /></div>\
-        <div>마커크기 <input class="series-markersize" type="number" step="1" value="6" /></div>\
-        <div>선스타일 <select class="series-linestyle" class="border p-1 rounded"><option value="solid">실선</option><option value="dash">파선</option><option value="dot">점선</option></select></div>\
-        <div><label><input class="series-showline" type="checkbox" checked/> 선</label> <label class="ml-2"><input class="series-showmarker" type="checkbox" checked/> 표식</label></div>\
+    div.className = 'series-control p-2 border rounded bg-white shadow-sm';
+    div.dataset.name = name;
+    div.innerHTML = `
+      <div class="font-bold border-b mb-2 text-xs text-blue-800">${name}</div>
+      <div class="grid grid-cols-2 gap-x-2 gap-y-1">
+        <label class="text-[10px]">색상 <input type="color" class="series-color w-full h-5" value="${['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'][i % 4]}" /></label>
+        <label class="text-[10px]">마커 <select class="series-marker w-full border text-[10px]"><option value="circle">●</option><option value="square">■</option><option value="triangle-up">▲</option></select></label>
+        <label class="text-[10px]">선두께 <input type="number" class="series-linewidth w-full border text-[10px]" value="2" step="0.5" /></label>
+        <label class="text-[10px]">마커크기 <input type="number" class="series-markersize w-full border text-[10px]" value="6" /></label>
+        <label class="text-[10px]">스타일 <select class="series-linestyle w-full border text-[10px]"><option value="solid">실선</option><option value="dash">파선</option><option value="dot">점선</option></select></label>
+        <div class="flex items-center gap-2 pt-3">
+          <label class="text-[10px]"><input type="checkbox" class="series-showline" checked /> 선</label>
+          <label class="text-[10px]"><input type="checkbox" class="series-showmarker" checked /> 표식</label>
+        </div>
       </div>`;
     container.appendChild(div);
   });
 }
 
-// Y축 라벨 UI 업데이트
-function updateYAxisLabelUI(yfields){
-  const container = document.getElementById('ylabels-container');
-  container.innerHTML = '';
-  yfields.forEach((field, idx)=>{
-    const div = document.createElement('div');
-    div.className = 'mb-2';
-    div.innerHTML = `
-      <label class="block text-sm">Y축${idx+1} 제목 (${field})</label>
-      <input id="ylabel_${idx}" class="border p-1 rounded w-full mb-1 text-sm" placeholder="제목 입력" />
-    `;
-    container.appendChild(div);
+function updateAxisLabelUI(x_fields, y_fields) {
+  const xCon = document.getElementById('xlabels-container');
+  const yCon = document.getElementById('ylabels-container');
+  xCon.innerHTML = ''; yCon.innerHTML = '';
+  x_fields.forEach((f, i) => {
+    xCon.innerHTML += `<label class="block text-xs mt-1">X축 ${i+1} 이름 (${f})</label><input id="xlabel_${i}" class="border p-1 rounded w-full text-sm" value="${f}" />`;
+  });
+  y_fields.forEach((f, i) => {
+    yCon.innerHTML += `<label class="block text-xs mt-1">Y축 ${i+1} 이름 (${f})</label><input id="ylabel_${i}" class="border p-1 rounded w-full text-sm" value="${f}" />`;
   });
 }
 
-function updateXAxisLabelUI(x_fields){
-  const container = document.getElementById('xlabels-container');
-  if (!container) return;
-  container.innerHTML = '';
-  for (let i=0;i<Math.min(2,x_fields.length);i++){
-    const div = document.createElement('div');
-    div.className = 'mb-2';
-    div.innerHTML = `<label class="block text-sm font-medium text-gray-700">X축 ${i+1} 제목</label><input type="text" id="xlabel_${i}" class="mt-1 block w-full border-gray-300 rounded-md" value="${x_fields[i]||''}">`;
-    container.appendChild(div);
-  }
+function calculateLinearRegression(x, y) {
+  const n = x.length;
+  const sumX = x.reduce((a, b) => a + b, 0);
+  const sumY = y.reduce((a, b) => a + b, 0);
+  const sumXY = x.reduce((a, b, i) => a + b * y[i], 0);
+  const sumXX = x.reduce((a, b) => a + b * b, 0);
+  const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+  const intercept = (sumY - slope * sumX) / n;
+  return { slope, intercept };
 }
 
-// High-res download (removed as requested)
+function polyfit(x, y, degree) {
+  const V = x.map(xi => Array.from({ length: degree + 1 }, (_, j) => Math.pow(xi, j)));
+  const VT = math.transpose(V);
+  const VTV = math.multiply(VT, V);
+  const VTy = math.multiply(VT, y);
+  return math.multiply(math.inv(VTV), VTy);
+}
 
-// 설정 반영 버튼
-btnUpdate.addEventListener('click', ()=>{ btnPlot.click(); });
+function polyval(coeffs, x) {
+  return x.map(xi => coeffs.reduce((acc, c, j) => acc + c * Math.pow(xi, j), 0));
+}
 
-// collapsible toggle visibility
-document.querySelectorAll('[id^="show-"]').forEach(checkbox=>{
-  checkbox.addEventListener('change', (e)=>{
-    const sectionName = checkbox.id.replace('show-','');
-    const content = document.getElementById(sectionName+'-content');
+// 초기화
+document.querySelectorAll('[id^="show-"]').forEach(checkbox => {
+  checkbox.addEventListener('change', () => {
+    const content = document.getElementById(checkbox.id.replace('show-', '') + '-content');
     if (content) content.style.display = checkbox.checked ? 'block' : 'none';
   });
 });
 
-// initial attach
-attachSeriesSettingsListeners();
-
-// expose helper for debugging
-window.pivotAndAggregate = pivotAndAggregate;
-window.polyfit = polyfit;
-window.polyval = polyval;
+btnUpdate.addEventListener('click', () => btnPlot.click());
