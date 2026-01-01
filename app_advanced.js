@@ -75,6 +75,13 @@ const tabData = el('tab-data');
 const tabChart = el('tab-chart');
 const panelData = el('panel-data');
 const panelChart = el('panel-chart');
+const serverRenderCheckbox = el('serverRender');
+const matplotImage = el('matplotImage');
+const serverImageContainer = el('serverImageContainer');
+const matplotDownload = el('matplotDownload');
+
+// Endpoint for server-side matplotlib rendering. Adjust if your server uses a different path.
+const RENDER_ENDPOINT = '/render';
 
 // ============ 탭 전환 ============
 function setTab(tab){
@@ -627,6 +634,13 @@ function renderChart(){
 
 // ============ 렌더 버튼 ============
 renderBtn.addEventListener('click', () => {
+  // If server-rendering is selected, send the uploaded file + settings to the server
+  if(serverRenderCheckbox && serverRenderCheckbox.checked){
+    renderServerPlot();
+    setTab('chart');
+    return;
+  }
+
   renderChart();
   setTab('chart');
 });
@@ -668,3 +682,85 @@ settingsElements.forEach(el => {
     });
   }
 });
+
+// ------------ Server-side rendering ----------------
+async function renderServerPlot(){
+  if(!fileInput || !fileInput.files || fileInput.files.length === 0){
+    alert('엑셀 파일을 업로드하고 시트를 선택한 뒤 서버 렌더링을 시도하세요.');
+    return;
+  }
+
+  const f = fileInput.files[0];
+  const fd = new FormData();
+  fd.append('file', f);
+  fd.append('sheet', sheetSelect.value || '');
+
+  // basic settings
+  fd.append('xKeys', JSON.stringify(Array.from(xSelect.selectedOptions).map(o=>o.value)));
+  fd.append('yKeys', JSON.stringify(Array.from(ySelect.selectedOptions).map(o=>o.value)));
+  fd.append('agg', aggSelect.value || 'none');
+  fd.append('chartType', chartTypeEl.value || 'scatter');
+  fd.append('chartTitle', (document.getElementById('chartTitle') && document.getElementById('chartTitle').value) || '');
+
+  // axis/grid/legend
+  fd.append('xTitle', xTitle ? xTitle.value : '');
+  fd.append('yTitle', yTitle ? yTitle.value : '');
+  fd.append('xMin', xMin && xMin.value ? xMin.value : '');
+  fd.append('xMax', xMax && xMax.value ? xMax.value : '');
+  fd.append('yMin', yMin && yMin.value ? yMin.value : '');
+  fd.append('yMax', yMax && yMax.value ? yMax.value : '');
+  fd.append('yLog', yLog && yLog.checked ? '1' : '0');
+  fd.append('gridColor', gridColor ? gridColor.value : '#cccccc');
+  fd.append('gridWidth', gridWidth ? gridWidth.value : '1');
+  fd.append('gridOpacity', gridOpacity ? gridOpacity.value : '30');
+  fd.append('legendPos', legendPos ? legendPos.value : 'top-right');
+
+  // series
+  fd.append('seriesColor', seriesColor ? seriesColor.value : '#1f77b4');
+  fd.append('lineWidth', lineWidth ? lineWidth.value : '2');
+  fd.append('markerSymbol', markerSymbol ? markerSymbol.value : 'circle');
+  fd.append('markerSize', markerSize ? markerSize.value : '8');
+
+  // error / trend / labels
+  fd.append('errorOn', errorBarsEnabled && errorBarsEnabled.checked ? '1' : '0');
+  fd.append('errorType', errorType ? errorType.value : 'fixed');
+  fd.append('errorValue', errorValue ? errorValue.value : '1');
+  fd.append('trendOn', trendlineEnabled && trendlineEnabled.checked ? '1' : '0');
+  fd.append('trendDegree', trendlineDegree ? trendlineDegree.value : '1');
+  fd.append('trendColor', trendlineColor ? trendlineColor.value : '#ff7f0e');
+  fd.append('labelOn', dataLabelsEnabled && dataLabelsEnabled.checked ? '1' : '0');
+  fd.append('labelDecimals', dataLabelsDecimals ? dataLabelsDecimals.value : '2');
+
+  try{
+    serverImageContainer.classList.add('hidden');
+    matplotImage.src = '';
+    matplotDownload.classList.add('hidden');
+
+    const resp = await fetch(RENDER_ENDPOINT, { method: 'POST', body: fd });
+    if(!resp.ok){
+      const txt = await resp.text();
+      alert('서버 렌더링 실패: ' + resp.status + '\n' + txt);
+      return;
+    }
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    matplotImage.src = url;
+    serverImageContainer.classList.remove('hidden');
+    matplotDownload.href = url;
+    matplotDownload.download = 'matplotlib_render.png';
+    matplotDownload.classList.remove('hidden');
+  } catch(err){
+    alert('서버 렌더 중 오류: ' + err.message);
+  }
+}
+
+// If user toggles serverRender off, hide server image container
+if(serverRenderCheckbox){
+  serverRenderCheckbox.addEventListener('change', () => {
+    if(!serverRenderCheckbox.checked){
+      serverImageContainer.classList.add('hidden');
+      matplotImage.src = '';
+      matplotDownload.classList.add('hidden');
+    }
+  });
+}
