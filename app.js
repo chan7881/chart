@@ -230,7 +230,6 @@ btnPlot.addEventListener('click', async ()=>{
   if (options.axis.yinvert){ layout.yaxis.autorange='reversed'; }
 
   // X axis 2 title (if second X selected)
-  const xchecks = Array.from(document.querySelectorAll('input[name="xfield"]:checked'));
   if (xchecks.length>1){
     const x2label = document.getElementById('xlabel_1')?.value || xchecks[1].value || '';
     layout.xaxis2 = {overlaying: 'x', side: 'top', title: {text: x2label, font:{size:12, color:'#000'}}, showgrid:false, zeroline:false, showline:true, linewidth:1.5, linecolor:'#000', mirror:true};
