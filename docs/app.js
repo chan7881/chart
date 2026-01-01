@@ -154,16 +154,16 @@ btnPlot.addEventListener('click', async ()=>{
   if (!yAxisMain && !yAxisSub) return alert('Y축을 최소 1개 선택하세요');
   if (displayFields.length === 0) return alert('표시할 값을 최소 1개 선택하세요');
   
-  // Use main axes for grouping/pivot (only main axes used for aggregation)
+  // Use main axes for grouping/pivot (only main X axis used for grouping)
+  // displayFields are aggregated (not yAxisMain/yAxisSub)
   const x_fields = xAxisMain ? [xAxisMain] : [];
-  const y_fields = yAxisMain ? [yAxisMain] : [];
   selectedYFields = displayFields; // store for label UI
   const chartType = document.getElementById('chartType').value;
 
-  // pivot/groupby using main axes only
+  // pivot/groupby using X axis main only, aggregate displayFields
   let plot_df = workbookData;
-  if (x_fields.length && y_fields.length){
-    plot_df = pivotAndAggregate(workbookData, x_fields, y_fields);
+  if (x_fields.length && displayFields.length){
+    plot_df = pivotAndAggregate(workbookData, x_fields, displayFields);
   }
 
   // Update Y-axis and X-axis label UI based on actual axis selections
@@ -181,7 +181,7 @@ btnPlot.addEventListener('click', async ()=>{
   const layout = {
     title: {text: document.getElementById('titleInput').value || '', font:{size:14, family:'Arial, sans-serif', color:'#000'}},
     xaxis:{title: {text: document.getElementById('xlabel_0')?.value || (x_fields[0]||''), font:{size:12, color:'#000'}}, showgrid:false, zeroline:false, showline:true, linewidth:1.5, linecolor:'#000', mirror:true},
-    yaxis:{title: {text: document.getElementById('ylabel_0')?.value || document.getElementById('ylabelInput').value || (displayFields[0]||''), font:{size:12, color:'#000'}}, showgrid:false, zeroline:false, showline:true, linewidth:1.5, linecolor:'#000', mirror:true},
+    yaxis:{title: {text: document.getElementById('ylabel_0')?.value || document.getElementById('ylabelInput').value || (yAxisMain||''), font:{size:12, color:'#000'}}, showgrid:false, zeroline:false, showline:true, linewidth:1.5, linecolor:'#000', mirror:true},
     template:'plotly_white',
     font:{family:'Arial, sans-serif', size:11, color:'#000'},
     margin:{l:60, r:40, t:50, b:50},
