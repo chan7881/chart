@@ -237,7 +237,22 @@ btnPlot.addEventListener('click', async ()=>{
 
   // render
   previewArea.innerHTML = '';
-  const gd = document.createElement('div'); gd.style.width='100%'; gd.style.height='480px'; previewArea.appendChild(gd);
+  const gd = document.createElement('div'); previewArea.appendChild(gd);
+  // apply optional user-specified size: set element style and Plotly layout dims
+  if (options.size && options.size.width){
+    gd.style.width = options.size.width + 'px';
+    layout.width = options.size.width;
+  } else {
+    gd.style.width = '100%';
+    if (layout.width) delete layout.width;
+  }
+  if (options.size && options.size.height){
+    gd.style.height = options.size.height + 'px';
+    layout.height = options.size.height;
+  } else {
+    gd.style.height = '480px';
+    if (layout.height) delete layout.height;
+  }
   Plotly.newPlot(gd, traces, layout, {responsive:true, displayModeBar:false});
 
 });
@@ -247,6 +262,12 @@ function collectOptionsFromUI(){
   options.xlabel = document.getElementById('xlabel_0')?.value || document.getElementById('xlabelInput')?.value || '';
   options.ylabel = document.getElementById('ylabel_0')?.value || document.getElementById('ylabelInput')?.value || '';
   options.axis = {};
+  // chart size (pixels) - optional
+  options.size = {};
+  const wVal = (document.getElementById('chartWidth')?.value || '').toString().trim();
+  const hVal = (document.getElementById('chartHeight')?.value || '').toString().trim();
+  if (wVal !== '') options.size.width = Number(wVal);
+  if (hVal !== '') options.size.height = Number(hVal);
   const xlim = document.getElementById('xlimInput').value.split(',').map(s=>s.trim()).filter(Boolean);
   if (xlim.length===2) options.axis.xlim = [Number(xlim[0]), Number(xlim[1])];
   const ylim = document.getElementById('ylimInput').value.split(',').map(s=>s.trim()).filter(Boolean);

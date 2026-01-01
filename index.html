@@ -20,7 +20,7 @@
 <body class="bg-gray-50 text-gray-800" id="bodyRoot">
   <div class="max-w-6xl mx-auto p-6">
     <div class="flex items-center justify-between mb-4">
-      <h1 class="text-2xl font-bold">엑셀 → Plotly 차트 변환기</h1>
+      <h1 class="text-2xl font-bold">엑셀 차트 변환기</h1>
     </div>
 
     <div class="border rounded bg-white p-4">
@@ -177,8 +177,17 @@
         </div>
       </div>
 
-      <div class="mt-4">
-        <button id="btnUpdatePreview" class="px-4 py-2 bg-indigo-600 text-white rounded mb-3">설정 반영</button>
+      <div class="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-3 items-end">
+        <div class="col-span-1 lg:col-span-2">
+          <label class="block text-sm">차트 크기 (픽셀)</label>
+          <div class="flex gap-2 mt-1">
+            <input id="chartWidth" type="number" min="0" placeholder="너비(px)" class="border p-1 rounded w-1/2 text-sm" />
+            <input id="chartHeight" type="number" min="0" placeholder="높이(px)" class="border p-1 rounded w-1/2 text-sm" />
+          </div>
+        </div>
+        <div class="col-span-1">
+          <button id="btnUpdatePreview" class="px-4 py-2 bg-indigo-600 text-white rounded mb-3">설정 반영</button>
+        </div>
       </div>
       <div class="mt-2">
         <h3 class="font-medium mb-2">미리보기</h3>
@@ -189,5 +198,4 @@
 
   <script src="app.js"></script>
 </body>
-
 </html>
