@@ -1,0 +1,309 @@
+// docs/app.js: frontend-only Excel -> Plotly pipeline
+
+const fileInput = document.getElementById('fileInput');
+const btnLoad = document.getElementById('btnLoad');
+const columnsArea = document.getElementById('columnsArea');
+const btnPlot = document.getElementById('btnPlot');
+const previewArea = document.getElementById('previewArea');
+const tabUpload = document.getElementById('tab-upload');
+const tabEdit = document.getElementById('tab-edit');
+const panelUpload = document.getElementById('panel-upload');
+const panelEdit = document.getElementById('panel-edit');
+const darkToggle = document.getElementById('darkToggle');
+const downloadHiRes = document.getElementById('downloadHiRes');
+
+tabUpload.addEventListener('click', ()=>{panelUpload.classList.remove('hidden');panelEdit.classList.add('hidden');tabUpload.classList.add('bg-blue-500');tabEdit.classList.remove('bg-blue-500');});
+tabEdit.addEventListener('click', ()=>{panelUpload.classList.add('hidden');panelEdit.classList.remove('hidden');tabEdit.classList.add('bg-blue-500');tabUpload.classList.remove('bg-blue-500');});
+
+darkToggle.addEventListener('change', ()=>{
+  document.getElementById('bodyRoot').classList.toggle('dark-mode', darkToggle.checked);
+});
+
+let workbookData = null; // array of objects
+let columns = [];
+
+btnLoad.addEventListener('click', ()=>{
+  if (!fileInput.files.length) return alert('엑셀 파일을 선택하세요');
+  const f = fileInput.files[0];
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    const data = new Uint8Array(e.target.result);
+    const wb = XLSX.read(data, {type:'array'});
+    const first = wb.SheetNames[0];
+    const ws = wb.Sheets[first];
+    const aoa = XLSX.utils.sheet_to_json(ws, {defval: null});
+    workbookData = aoa; // array of row objects
+    columns = Object.keys(aoa[0]||{});
+    renderColumns(columns);
+    alert('파일 로드 완료: '+first + ' 시트, 행수: ' + aoa.length);
+  };
+  reader.readAsArrayBuffer(f);
+});
+
+function renderColumns(cols){
+  columnsArea.innerHTML = '';
+  const left = document.createElement('div');
+  const right = document.createElement('div');
+  cols.forEach((c,i)=>{
+    const el = document.createElement('div');
+    el.className = 'p-2';
+    el.innerHTML = `
+      <div class="font-medium">${c}</div>
+      <label class="text-sm">X<input type="radio" name="xfield" value="${c}" class="ml-2" /></label>
+      <label class="text-sm ml-2">Y<input type="checkbox" name="yfield" value="${c}" class="ml-2" /></label>
+    `;
+    if (i % 2 === 0) left.appendChild(el); else right.appendChild(el);
+  });
+  columnsArea.appendChild(left);
+  columnsArea.appendChild(right);
+  attachSeriesSettingsListeners();
+}
+
+// pivot/groupby & aggregation (mean)
+function pivotAndAggregate(data, groupCols, aggCols){
+  if (!groupCols.length) return data.map(r=>({__index: data.indexOf(r), ...r}));
+  const map = new Map();
+  data.forEach(row=>{
+    const key = groupCols.map(c=>String(row[c])).join('||');
+    if (!map.has(key)) map.set(key, {count:0});
+    const entry = map.get(key);
+    groupCols.forEach(c=> entry[c]=row[c]);
+    aggCols.forEach(c=>{ entry[c] = (entry[c]||0) + (row[c] == null ? 0 : Number(row[c])); });
+    entry.count += 1;
+  });
+  const out = [];
+  map.forEach(v=>{
+    const obj = {};
+    groupCols.forEach(c=>obj[c]=v[c]);
+    aggCols.forEach(c=> obj[c] = v.count ? (v[c]/v.count) : null );
+    out.push(obj);
+  });
+  return out;
+}
+
+// simple polyfit using math.js
+function polyfit(x, y, degree){
+  const n = x.length;
+  const V = [];
+  for (let i=0;i<n;i++){
+    const row = [];
+    for (let j=0;j<=degree;j++) row.push(Math.pow(x[i], j));
+    V.push(row);
+  }
+  const VT = math.transpose(V);
+  const VTV = math.multiply(VT, V);
+  const inv = math.inv(VTV);
+  const VTy = math.multiply(VT, y);
+  const coeffs = math.multiply(inv, VTy); // vector
+  return coeffs; // array of coefficients [a0, a1, ...]
+}
+
+function polyval(coeffs, x){
+  return x.map(xx=> coeffs.reduce((s,c,i)=> s + c * Math.pow(xx,i), 0));
+}
+
+btnPlot.addEventListener('click', async ()=>{
+  if (!workbookData) return alert('먼저 파일을 로드하세요');
+  const xradio = document.querySelector('input[name="xfield"]:checked');
+  const ychecks = Array.from(document.querySelectorAll('input[name="yfield"]:checked'));
+  const x_fields = xradio ? [xradio.value] : [];
+  const y_fields = ychecks.map(i=>i.value);
+  const chartType = document.getElementById('chartType').value;
+
+  // pivot/groupby
+  let plot_df = workbookData;
+  if (x_fields.length && y_fields.length){
+    plot_df = pivotAndAggregate(workbookData, x_fields, y_fields);
+  }
+
+  // build traces
+  const traces = [];
+  const layout = {title: document.getElementById('titleInput').value || '', xaxis:{title: document.getElementById('xlabelInput').value || (x_fields[0]||'' )}, yaxis:{title: document.getElementById('ylabelInput').value || (y_fields[0]||'')}, template: darkToggle.checked ? 'plotly_dark' : 'plotly'};
+
+  const options = collectOptionsFromUI();
+
+  const xvals = x_fields.length ? plot_df.map(r=>r[x_fields[0]]) : plot_df.map((r,i)=>i);
+
+  y_fields.forEach((ycol, idx)=>{
+    const yvals = plot_df.map(r=>Number(r[ycol]));
+    const color = options.series[ycol]?.color || (`hsl(${(idx*60)%360} 70% 45%)`);
+    const trace = {
+      x: xvals,
+      y: yvals,
+      name: ycol,
+      mode: (options.series[ycol]?.show_line ? 'lines' : '') + (options.series[ycol]?.show_marker ? '+markers' : ''),
+      marker: {color: color, size: options.series[ycol]?.markersize || 6, opacity: options.series[ycol]?.alpha || 1.0, symbol: options.series[ycol]?.marker || 'circle'},
+      line: {color: color, width: options.series[ycol]?.linewidth || 2, dash: 'solid', shape: 'linear'},
+    };
+    // errorbars
+    if (options.errorbars.enabled){
+      const mode = options.errorbars.mode;
+      if (mode==='fixed'){
+        trace.error_y = {type:'data', array: yvals.map(()=>Number(options.errorbars.amount||0)), visible:true};
+      } else if (mode==='percent'){
+        trace.error_y = {type:'data', array: yvals.map(v=>Math.abs(v)*Number(options.errorbars.amount||0)/100.0), visible:true};
+      } else if (mode==='std'){
+        const std = Math.sqrt(yvals.reduce((s,v)=>s + Math.pow(v - (yvals.reduce((a,b)=>a+b,0)/yvals.length),2),0)/yvals.length);
+        trace.error_y = {type:'data', array: yvals.map(()=>std), visible:true};
+      }
+    }
+
+    // dual axis: second series assign to yaxis: 'y2'
+    if (idx===1 && options.dual_axis){
+      trace.yaxis = 'y2';
+      layout.yaxis2 = {overlaying: 'y', side: 'right', title: ycol};
+    }
+
+    traces.push(trace);
+
+    // trendline
+    if (options.trendline.enabled){
+      if (options.trendline.type==='linear'){
+        // linear fit
+        const xv = xvals.map(Number);
+        const yv = yvals.map(Number);
+        const xmean = xv.reduce((a,b)=>a+b,0)/xv.length;
+        const ymean = yv.reduce((a,b)=>a+b,0)/yv.length;
+        let num=0, den=0;
+        for (let i=0;i<xv.length;i++){ num += (xv[i]-xmean)*(yv[i]-ymean); den += Math.pow(xv[i]-xmean,2); }
+        const slope = den===0?0: num/den; const intercept = ymean - slope*xmean;
+        const trendY = xv.map(xx=> intercept + slope*xx);
+        traces.push({x:xv, y:trendY, mode:'lines', name: ycol + ' 추세선', line:{dash:'dash', width:2, color: color}});
+        if (options.trendline.showEq){
+          const eq = `y=${slope.toFixed(3)}x+${intercept.toFixed(3)}`;
+          layout.annotations = (layout.annotations||[]).concat([{x: xv[Math.floor(xv.length/2)], y: trendY[Math.floor(trendY.length/2)], text: eq, showarrow:false}]);
+        }
+      } else if (options.trendline.type==='poly'){
+        const deg = Math.max(1, parseInt(options.trendline.degree||2,10));
+        const xv = xvals.map(Number); const yv = yvals.map(Number);
+        try{
+          const coeffs = polyfit(xv, yv, deg); // math.js vector
+          const coeffsArr = coeffs.map(c=>c);
+          const trendY = polyval(coeffsArr, xv);
+          traces.push({x:xv, y:trendY, mode:'lines', name: ycol + ' 추세선', line:{dash:'dash', width:2, color: color}});
+          if (options.trendline.showEq){
+            const eq = coeffsArr.map((c,i)=> `${c.toFixed(3)}x^${i}` ).join(' + ');
+            layout.annotations = (layout.annotations||[]).concat([{x: xv[Math.floor(xv.length/2)], y: trendY[Math.floor(trendY.length/2)], text: eq, showarrow:false, font:{size:10}}]);
+          }
+        }catch(e){ console.warn('polyfit 실패', e); }
+      }
+    }
+
+    // data labels
+    if (options.datalabels.enabled){
+      const labels = yvals.map(v=> (Number(v).toFixed(options.datalabels.decimals||0)) );
+      trace.text = labels; trace.textposition = 'top center';
+    }
+
+  });
+
+  // grid
+  if (options.grid.enabled){
+    layout.xaxis = layout.xaxis || {};
+    layout.yaxis = layout.yaxis || {};
+    layout.xaxis.gridcolor = options.grid.color; layout.xaxis.gridwidth = options.grid.width||1; layout.xaxis.gridalpha = options.grid.alpha||0.5;
+    layout.yaxis.gridcolor = options.grid.color; layout.yaxis.gridwidth = options.grid.width||1; layout.yaxis.gridalpha = options.grid.alpha||0.5;
+  }
+
+  // legend position
+  if (options.legend.position){
+    if (options.legend.position==='outside'){
+      layout.legend = {x:1.02, y:1, xanchor:'left'};
+    } else {
+      const mapPos = {'top right':{x:1,y:1,'xanchor':'right','yanchor':'top'}, 'top left':{x:0,y:1,'xanchor':'left','yanchor':'top'}, 'bottom left':{x:0,y:0,'xanchor':'left','yanchor':'bottom'}, 'bottom right':{x:1,y:0,'xanchor':'right','yanchor':'bottom'}};
+      layout.legend = mapPos[options.legend.position] || {};
+    }
+  }
+
+  // axis ranges and log
+  if (options.axis.xlim){ layout.xaxis.range = options.axis.xlim.map(Number); }
+  if (options.axis.ylim){ layout.yaxis.range = options.axis.ylim.map(Number); }
+  if (options.axis.xlog){ layout.xaxis.type='log'; }
+  if (options.axis.yinvert){ layout.yaxis.autorange='reversed'; }
+
+  // render
+  previewArea.innerHTML = '';
+  const gd = document.createElement('div'); gd.style.width='100%'; gd.style.height='480px'; previewArea.appendChild(gd);
+  Plotly.newPlot(gd, traces, layout, {responsive:true});
+
+});
+
+function collectOptionsFromUI(){
+  const options = {};
+  options.xlabel = document.getElementById('xlabelInput').value || '';
+  options.ylabel = document.getElementById('ylabelInput').value || '';
+  options.axis = {};
+  const xlim = document.getElementById('xlimInput').value.split(',').map(s=>s.trim()).filter(Boolean);
+  if (xlim.length===2) options.axis.xlim = [Number(xlim[0]), Number(xlim[1])];
+  const ylim = document.getElementById('ylimInput').value.split(',').map(s=>s.trim()).filter(Boolean);
+  if (ylim.length===2) options.axis.ylim = [Number(ylim[0]), Number(ylim[1])];
+  options.axis.xlog = document.getElementById('xlog').checked;
+  options.axis.yinvert = document.getElementById('yinvert').checked;
+  options.grid = {enabled: document.getElementById('gridToggle').checked, color: document.getElementById('gridColor').value, alpha: Number(document.getElementById('gridAlpha').value), width:1};
+  options.legend = {position: document.getElementById('legendPos').value};
+  options.errorbars = {enabled: document.getElementById('ebEnabled').checked, mode: document.getElementById('ebMode').value, amount: Number(document.getElementById('ebAmount').value||0)};
+  options.trendline = {enabled: document.getElementById('trendEnabled').checked, type: document.getElementById('trendType').value, degree: Number(document.getElementById('trendDegree').value||2), showEq: document.getElementById('trendShowEq').checked};
+  options.datalabels = {enabled:false};
+  options.dual_axis = true;
+  // series
+  options.series = {};
+  const seriesControls = document.querySelectorAll('.series-control');
+  seriesControls.forEach(sc=>{
+    const name = sc.dataset.name;
+    const color = sc.querySelector('.series-color')?.value || '#1f77b4';
+    const linewidth = Number(sc.querySelector('.series-linewidth')?.value||1.5);
+    const marker = sc.querySelector('.series-marker')?.value || 'circle';
+    const markersize = Number(sc.querySelector('.series-markersize')?.value||6);
+    const alpha = Number(sc.querySelector('.series-alpha')?.value||1.0);
+    const show_line = sc.querySelector('.series-showline')?.checked || false;
+    const show_marker = sc.querySelector('.series-showmarker')?.checked || false;
+    options.series[name] = {color, linewidth, marker, markersize, alpha, show_line, show_marker};
+  });
+  return options;
+}
+
+// per-series controls
+function attachSeriesSettingsListeners(){
+  const container = document.getElementById('seriesControls');
+  container.innerHTML = '';
+  const ychecks = Array.from(document.querySelectorAll('input[name="yfield"]'));
+  ychecks.forEach(cb=>{ cb.addEventListener('change', ()=>renderSeriesControls()); });
+  renderSeriesControls();
+}
+function renderSeriesControls(){
+  const container = document.getElementById('seriesControls'); container.innerHTML = '';
+  const ychecks = Array.from(document.querySelectorAll('input[name="yfield"]:checked'));
+  ychecks.forEach(cb=>{
+    const name = cb.value;
+    const div = document.createElement('div');
+    div.className = 'series-control p-2 border rounded'; div.dataset.name = name;
+    div.innerHTML = `\
+      <div class="font-medium">${name}</div>\
+      <div class="grid grid-cols-2 gap-2 mt-1">\
+        <div>색 <input class="series-color" type="color" value="#1f77b4" /></div>\
+        <div>선너비 <input class="series-linewidth" type="number" step="0.1" value="1.5" /></div>\
+        <div>마커 <input class="series-marker" value="circle" /></div>\
+        <div>마커크기 <input class="series-markersize" type="number" step="1" value="6" /></div>\
+        <div>투명도 <input class="series-alpha" type="range" min="0" max="1" step="0.1" value="1" /></div>\
+        <div><label><input class="series-showline" type="checkbox" checked/> 선</label> <label class="ml-2"><input class="series-showmarker" type="checkbox" checked/> 표식</label></div>\
+      </div>`;
+    container.appendChild(div);
+  });
+}
+
+// High-res download
+downloadHiRes.addEventListener('click', ()=>{
+  const gd = previewArea.querySelector('.js-plotly-plot');
+  if (!gd) return alert('먼저 차트를 생성하세요');
+  const scale = prompt('배율 입력 (예: 2 = 2x 고해상도)', '2');
+  const s = Math.max(1, Number(scale)||2);
+  Plotly.downloadImage(gd, {format:'png', width:1600*s, height:900*s, scale: s});
+});
+
+// initial attach
+attachSeriesSettingsListeners();
+
+// expose helper for debugging
+window.pivotAndAggregate = pivotAndAggregate;
+window.polyfit = polyfit;
+window.polyval = polyval;
