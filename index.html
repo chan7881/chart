@@ -74,46 +74,237 @@
 
       <section id="panel-chart" class="hidden">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div class="col-span-1 md:col-span-1 space-y-3">
-            <h3 class="font-semibold">세부 설정</h3>
+          <div class="col-span-1 md:col-span-1 space-y-3 max-h-[600px] overflow-y-auto">
+            <h3 class="font-semibold sticky top-0 bg-white z-10 py-2">세부 설정</h3>
             <div class="space-y-2">
-              <details class="p-2 border rounded bg-white dark:bg-gray-800">
-                <summary class="font-medium">축 (Axis)</summary>
-                <div class="mt-2 space-y-2">
-                  <label>X축 제목</label>
-                  <input id="xTitle" class="w-full border rounded p-1">
-                  <label>Y축 제목</label>
-                  <input id="yTitle" class="w-full border rounded p-1">
-                  <label>로그 스케일</label>
-                  <input id="yLog" type="checkbox" class="ml-2">
+              <!-- 축 설정 -->
+              <details class="p-2 border rounded bg-white" open>
+                <summary class="font-medium cursor-pointer">축 (Axis)</summary>
+                <div class="mt-2 space-y-2 text-sm">
+                  <div>
+                    <label class="block">X축 제목</label>
+                    <input id="xTitle" class="w-full border rounded p-1" placeholder="X축 제목">
+                  </div>
+                  <div>
+                    <label class="block">Y축 제목</label>
+                    <input id="yTitle" class="w-full border rounded p-1" placeholder="Y축 제목">
+                  </div>
+                  <div>
+                    <label class="block">X축 최소값</label>
+                    <input id="xMin" type="number" class="w-full border rounded p-1" placeholder="자동">
+                  </div>
+                  <div>
+                    <label class="block">X축 최대값</label>
+                    <input id="xMax" type="number" class="w-full border rounded p-1" placeholder="자동">
+                  </div>
+                  <div>
+                    <label class="block">Y축 최소값</label>
+                    <input id="yMin" type="number" class="w-full border rounded p-1" placeholder="자동">
+                  </div>
+                  <div>
+                    <label class="block">Y축 최대값</label>
+                    <input id="yMax" type="number" class="w-full border rounded p-1" placeholder="자동">
+                  </div>
+                  <div>
+                    <label class="inline-flex items-center gap-2">
+                      <input id="yLog" type="checkbox" class="w-4 h-4"> 로그 스케일
+                    </label>
+                  </div>
+                  <div>
+                    <label class="inline-flex items-center gap-2">
+                      <input id="xReverse" type="checkbox" class="w-4 h-4"> X축 반전
+                    </label>
+                  </div>
+                  <div>
+                    <label class="inline-flex items-center gap-2">
+                      <input id="yReverse" type="checkbox" class="w-4 h-4"> Y축 반전
+                    </label>
+                  </div>
                 </div>
               </details>
 
-              <details class="p-2 border rounded bg-white dark:bg-gray-800">
-                <summary class="font-medium">눈금선</summary>
-                <div class="mt-2 space-y-2">
-                  <label>눈금선 색상</label>
-                  <input id="gridColor" type="color" value="#cccccc">
+              <!-- 눈금선 설정 -->
+              <details class="p-2 border rounded bg-white">
+                <summary class="font-medium cursor-pointer">눈금선 (Gridlines)</summary>
+                <div class="mt-2 space-y-2 text-sm">
+                  <div>
+                    <label class="block">눈금선 색상</label>
+                    <input id="gridColor" type="color" value="#cccccc" class="w-full border rounded p-1">
+                  </div>
+                  <div>
+                    <label class="block">선 너비</label>
+                    <input id="gridWidth" type="number" min="0.5" max="5" step="0.5" value="1" class="w-full border rounded p-1">
+                  </div>
+                  <div>
+                    <label class="block">투명도 (%)</label>
+                    <input id="gridOpacity" type="number" min="0" max="100" value="100" class="w-full border rounded p-1">
+                  </div>
+                  <div>
+                    <label class="block">대시 스타일</label>
+                    <select id="gridDash" class="w-full border rounded p-1">
+                      <option value="solid">실선</option>
+                      <option value="dot">점선</option>
+                      <option value="dash">대시</option>
+                      <option value="dashdot">대시-점</option>
+                    </select>
+                  </div>
                 </div>
               </details>
 
-              <details class="p-2 border rounded bg-white dark:bg-gray-800">
-                <summary class="font-medium">범례 (Legend)</summary>
-                <div class="mt-2 space-y-2">
-                  <label>위치</label>
-                  <select id="legendPos" class="w-full border rounded p-1"><option value="top">상</option><option value="right">우</option><option value="bottom">하</option><option value="left">좌</option></select>
+              <!-- 범례 설정 -->
+              <details class="p-2 border rounded bg-white">
+                <summary class="font-medium cursor-pointer">범례 (Legend)</summary>
+                <div class="mt-2 space-y-2 text-sm">
+                  <div>
+                    <label class="block">위치</label>
+                    <select id="legendPos" class="w-full border rounded p-1">
+                      <option value="top-right">상-우</option>
+                      <option value="top-left">상-좌</option>
+                      <option value="bottom-right">하-우</option>
+                      <option value="bottom-left">하-좌</option>
+                      <option value="outside">차트 밖</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="inline-flex items-center gap-2">
+                      <input id="legendShowLegend" type="checkbox" checked class="w-4 h-4"> 범례 표시
+                    </label>
+                  </div>
                 </div>
               </details>
 
-              <details class="p-2 border rounded bg-white dark:bg-gray-800">
-                <summary class="font-medium">계열 서식 (Series)</summary>
-                <div class="mt-2 space-y-2">
-                  <label>선 색상</label>
-                  <input id="seriesColor" type="color" value="#1f77b4">
-                  <label>마커 모양</label>
-                  <select id="markerSymbol" class="w-full border rounded p-1"><option value="circle">circle</option><option value="square">square</option><option value="diamond">diamond</option><option value="cross">cross</option></select>
-                  <label>마커 크기</label>
-                  <input id="markerSize" type="number" min="1" max="30" value="8" class="w-full border rounded p-1">
+              <!-- 계열 서식 -->
+              <details class="p-2 border rounded bg-white">
+                <summary class="font-medium cursor-pointer">계열 서식 (Series)</summary>
+                <div class="mt-2 space-y-2 text-sm">
+                  <div>
+                    <label class="block">선 색상</label>
+                    <input id="seriesColor" type="color" value="#1f77b4" class="w-full border rounded p-1">
+                  </div>
+                  <div>
+                    <label class="block">선 너비</label>
+                    <input id="lineWidth" type="number" min="0.5" max="5" step="0.5" value="2" class="w-full border rounded p-1">
+                  </div>
+                  <div>
+                    <label class="block">마커 모양</label>
+                    <select id="markerSymbol" class="w-full border rounded p-1">
+                      <option value="circle">원형</option>
+                      <option value="square">사각형</option>
+                      <option value="diamond">마름모</option>
+                      <option value="cross">십자</option>
+                      <option value="x">X</option>
+                      <option value="triangle-up">삼각형-위</option>
+                      <option value="triangle-down">삼각형-아래</option>
+                      <option value="star">별</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block">마커 크기</label>
+                    <input id="markerSize" type="number" min="1" max="30" value="8" class="w-full border rounded p-1">
+                  </div>
+                  <div>
+                    <label class="block">마커 색상</label>
+                    <input id="markerColor" type="color" value="#1f77b4" class="w-full border rounded p-1">
+                  </div>
+                </div>
+              </details>
+
+              <!-- 오차 막대 -->
+              <details class="p-2 border rounded bg-white">
+                <summary class="font-medium cursor-pointer">오차 막대 (Error Bars)</summary>
+                <div class="mt-2 space-y-2 text-sm">
+                  <div>
+                    <label class="inline-flex items-center gap-2">
+                      <input id="errorBarsEnabled" type="checkbox" class="w-4 h-4"> 오차 막대 표시
+                    </label>
+                  </div>
+                  <div>
+                    <label class="block">방향</label>
+                    <select id="errorDirection" class="w-full border rounded p-1" disabled>
+                      <option value="y">Y축</option>
+                      <option value="x">X축</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block">오차 유형</label>
+                    <select id="errorType" class="w-full border rounded p-1" disabled>
+                      <option value="fixed">고정값</option>
+                      <option value="percent">백분율 (%)</option>
+                      <option value="stdev">표준편차</option>
+                      <option value="sterror">표준오차</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block">오차량</label>
+                    <input id="errorValue" type="number" step="0.1" value="1" class="w-full border rounded p-1" disabled placeholder="예: 0.5 또는 10%">
+                  </div>
+                </div>
+              </details>
+
+              <!-- 추세선 -->
+              <details class="p-2 border rounded bg-white">
+                <summary class="font-medium cursor-pointer">추세선 (Trendline)</summary>
+                <div class="mt-2 space-y-2 text-sm">
+                  <div>
+                    <label class="inline-flex items-center gap-2">
+                      <input id="trendlineEnabled" type="checkbox" class="w-4 h-4"> 추세선 표시
+                    </label>
+                  </div>
+                  <div>
+                    <label class="block">타입</label>
+                    <select id="trendlineType" class="w-full border rounded p-1" disabled>
+                      <option value="linear">선형</option>
+                      <option value="poly">다항식</option>
+                      <option value="exp">지수</option>
+                      <option value="log">로그</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block">다항식 차수</label>
+                    <input id="trendlineDegree" type="number" min="1" max="5" value="2" class="w-full border rounded p-1" disabled placeholder="2~5">
+                  </div>
+                  <div>
+                    <label class="inline-flex items-center gap-2">
+                      <input id="trendlineShowEq" type="checkbox" class="w-4 h-4" disabled> 수식 표시
+                    </label>
+                  </div>
+                  <div>
+                    <label class="inline-flex items-center gap-2">
+                      <input id="trendlineShowR2" type="checkbox" checked class="w-4 h-4" disabled> R² 값 표시
+                    </label>
+                  </div>
+                  <div>
+                    <label class="block">선 색상</label>
+                    <input id="trendlineColor" type="color" value="#ff7f0e" class="w-full border rounded p-1" disabled>
+                  </div>
+                  <div>
+                    <label class="block">선 너비</label>
+                    <input id="trendlineWidth" type="number" min="0.5" max="5" step="0.5" value="2" class="w-full border rounded p-1" disabled>
+                  </div>
+                </div>
+              </details>
+
+              <!-- 데이터 레이블 -->
+              <details class="p-2 border rounded bg-white">
+                <summary class="font-medium cursor-pointer">데이터 레이블 (Data Labels)</summary>
+                <div class="mt-2 space-y-2 text-sm">
+                  <div>
+                    <label class="inline-flex items-center gap-2">
+                      <input id="dataLabelsEnabled" type="checkbox" class="w-4 h-4"> 데이터 값 표시
+                    </label>
+                  </div>
+                  <div>
+                    <label class="block">반올림 소수점</label>
+                    <input id="dataLabelsDecimals" type="number" min="0" max="5" value="2" class="w-full border rounded p-1" disabled placeholder="0~5">
+                  </div>
+                  <div>
+                    <label class="block">폰트 크기</label>
+                    <input id="dataLabelsFontSize" type="number" min="8" max="24" value="12" class="w-full border rounded p-1" disabled>
+                  </div>
+                  <div>
+                    <label class="block">폰트 색상</label>
+                    <input id="dataLabelsFontColor" type="color" value="#000000" class="w-full border rounded p-1" disabled>
+                  </div>
                 </div>
               </details>
             </div>
@@ -121,7 +312,7 @@
 
           <div class="col-span-1 md:col-span-2">
             <h3 class="font-semibold">차트 미리보기</h3>
-            <div id="plot2" class="w-full h-[520px] bg-white rounded shadow dark:bg-gray-800"></div>
+            <div id="plot2" class="w-full h-[520px] bg-white rounded shadow"></div>
           </div>
         </div>
       </section>
@@ -130,6 +321,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.plot.ly/plotly-2.20.0.min.js"></script>
-  <script src="app.js"></script>
+  <script src="app_advanced.js"></script>
 </body>
 </html>
