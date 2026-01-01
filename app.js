@@ -9,20 +9,15 @@ const tabUpload = document.getElementById('tab-upload');
 const tabEdit = document.getElementById('tab-edit');
 const panelUpload = document.getElementById('panel-upload');
 const panelEdit = document.getElementById('panel-edit');
-const darkToggle = document.getElementById('darkToggle');
-const downloadHiRes = document.getElementById('downloadHiRes');
 const swapAxes = document.getElementById('swapAxes');
 const btnUpdate = document.getElementById('btnUpdate');
 
 // state: track swapped columns
 let isSwapped = false;
+let selectedYFields = []; // track Y fields for multi-label support
 
 tabUpload.addEventListener('click', ()=>{panelUpload.classList.remove('hidden');panelEdit.classList.add('hidden');tabUpload.classList.add('bg-blue-500');tabEdit.classList.remove('bg-blue-500');});
 tabEdit.addEventListener('click', ()=>{panelUpload.classList.add('hidden');panelEdit.classList.remove('hidden');tabEdit.classList.add('bg-blue-500');tabUpload.classList.remove('bg-blue-500');});
-
-darkToggle.addEventListener('change', ()=>{
-  document.getElementById('bodyRoot').classList.toggle('dark-mode', darkToggle.checked);
-});
 
 let workbookData = null; // array of objects
 let columns = [];
@@ -113,6 +108,7 @@ btnPlot.addEventListener('click', async ()=>{
   const ychecks = Array.from(document.querySelectorAll('input[name="yfield"]:checked'));
   const x_fields = xradio ? [xradio.value] : [];
   const y_fields = ychecks.map(i=>i.value);
+  selectedYFields = y_fields; // store for label UI
   const chartType = document.getElementById('chartType').value;
 
   // pivot/groupby
@@ -121,9 +117,20 @@ btnPlot.addEventListener('click', async ()=>{
     plot_df = pivotAndAggregate(workbookData, x_fields, y_fields);
   }
 
+  // Update Y-axis label UI
+  updateYAxisLabelUI(y_fields);
+
   // build traces
   const traces = [];
-  const layout = {title: document.getElementById('titleInput').value || '', xaxis:{title: document.getElementById('xlabelInput').value || (x_fields[0]||'' )}, yaxis:{title: document.getElementById('ylabelInput').value || (y_fields[0]||'')}, template: darkToggle.checked ? 'plotly_dark' : 'plotly'};
+  const layout = {
+    title: {text: document.getElementById('titleInput').value || '', font:{size:14, family:'Arial, sans-serif', color:'#000'}},
+    xaxis:{title: {text: document.getElementById('xlabelInput').value || (x_fields[0]||''), font:{size:12, color:'#000'}}, showgrid:false, zeroline:false, showline:true, linewidth:1.5, linecolor:'#000', mirror:true},
+    yaxis:{title: {text: document.getElementById('ylabel_0')?.value || document.getElementById('ylabelInput').value || (y_fields[0]||''), font:{size:12, color:'#000'}}, showgrid:false, zeroline:false, showline:true, linewidth:1.5, linecolor:'#000', mirror:true},
+    template:'plotly_white',
+    font:{family:'Arial, sans-serif', size:11, color:'#000'},
+    margin:{l:60, r:40, t:50, b:50},
+    hovermode:'closest'
+  };
 
   const options = collectOptionsFromUI();
 
@@ -131,14 +138,14 @@ btnPlot.addEventListener('click', async ()=>{
 
   y_fields.forEach((ycol, idx)=>{
     const yvals = plot_df.map(r=>Number(r[ycol]));
-    const color = options.series[ycol]?.color || (`hsl(${(idx*60)%360} 70% 45%)`);
+    const color = options.series[ycol]?.color || '#000000'; // Default to black
     const trace = {
       x: xvals,
       y: yvals,
       name: ycol,
       mode: (options.series[ycol]?.show_line ? 'lines' : '') + (options.series[ycol]?.show_marker ? '+markers' : ''),
-      marker: {color: color, size: options.series[ycol]?.markersize || 6, opacity: options.series[ycol]?.alpha || 1.0, symbol: options.series[ycol]?.marker || 'circle'},
-      line: {color: color, width: options.series[ycol]?.linewidth || 2, dash: 'solid', shape: 'linear'},
+      marker: {color: color, size: options.series[ycol]?.markersize || 6, opacity: 1.0, symbol: options.series[ycol]?.marker || 'circle'},
+      line: {color: color, width: options.series[ycol]?.linewidth || 2, dash: options.series[ycol]?.linestyle || 'solid'},
     };
     // errorbars
     if (options.errorbars.enabled){
@@ -156,7 +163,8 @@ btnPlot.addEventListener('click', async ()=>{
     // dual axis: second series assign to yaxis: 'y2'
     if (idx===1 && options.dual_axis){
       trace.yaxis = 'y2';
-      layout.yaxis2 = {overlaying: 'y', side: 'right', title: ycol};
+      const y2label = document.getElementById('ylabel_1')?.value || y_fields[1] || '';
+      layout.yaxis2 = {overlaying: 'y', side: 'right', title: {text: y2label, font:{size:12, color:'#000'}}, showgrid:false, zeroline:false, showline:true, linewidth:1.5, linecolor:'#000', mirror:true};
     }
 
     traces.push(trace);
@@ -204,10 +212,12 @@ btnPlot.addEventListener('click', async ()=>{
 
   // grid
   if (options.grid.enabled){
-    layout.xaxis = layout.xaxis || {};
-    layout.yaxis = layout.yaxis || {};
-    layout.xaxis.gridcolor = options.grid.color; layout.xaxis.gridwidth = options.grid.width||1; layout.xaxis.gridalpha = options.grid.alpha||0.5;
-    layout.yaxis.gridcolor = options.grid.color; layout.yaxis.gridwidth = options.grid.width||1; layout.yaxis.gridalpha = options.grid.alpha||0.5;
+    layout.xaxis.showgrid = true;
+    layout.xaxis.gridcolor = options.grid.color;
+    layout.xaxis.gridwidth = 1;
+    layout.yaxis.showgrid = true;
+    layout.yaxis.gridcolor = options.grid.color;
+    layout.yaxis.gridwidth = 1;
   }
 
   // legend position
@@ -229,7 +239,7 @@ btnPlot.addEventListener('click', async ()=>{
   // render
   previewArea.innerHTML = '';
   const gd = document.createElement('div'); gd.style.width='100%'; gd.style.height='480px'; previewArea.appendChild(gd);
-  Plotly.newPlot(gd, traces, layout, {responsive:true});
+  Plotly.newPlot(gd, traces, layout, {responsive:true, displayModeBar:false});
 
 });
 
@@ -272,14 +282,14 @@ function collectOptionsFromUI(){
     const seriesControls = document.querySelectorAll('.series-control');
     seriesControls.forEach(sc=>{
       const name = sc.dataset.name;
-      const color = sc.querySelector('.series-color')?.value || '#1f77b4';
-      const linewidth = Number(sc.querySelector('.series-linewidth')?.value||1.5);
+      const color = sc.querySelector('.series-color')?.value || '#000000';
+      const linewidth = Number(sc.querySelector('.series-linewidth')?.value||2);
       const marker = sc.querySelector('.series-marker')?.value || 'circle';
       const markersize = Number(sc.querySelector('.series-markersize')?.value||6);
-      const alpha = Number(sc.querySelector('.series-alpha')?.value||1.0);
+      const linestyle = sc.querySelector('.series-linestyle')?.value || 'solid';
       const show_line = sc.querySelector('.series-showline')?.checked || false;
       const show_marker = sc.querySelector('.series-showmarker')?.checked || false;
-      options.series[name] = {color, linewidth, marker, markersize, alpha, show_line, show_marker};
+      options.series[name] = {color, linewidth, marker, markersize, linestyle, show_line, show_marker};
     });
   }
   return options;
@@ -303,25 +313,33 @@ function renderSeriesControls(){
     div.innerHTML = `\
       <div class="font-medium">${name}</div>\
       <div class="grid grid-cols-2 gap-2 mt-1">\
-        <div>색 <input class="series-color" type="color" value="#1f77b4" /></div>\
-        <div>선너비 <input class="series-linewidth" type="number" step="0.1" value="1.5" /></div>\
+        <div>색 <input class="series-color" type="color" value="#000000" /></div>\
+        <div>선너비 <input class="series-linewidth" type="number" step="0.1" value="2" /></div>\
         <div>마커 <input class="series-marker" value="circle" /></div>\
         <div>마커크기 <input class="series-markersize" type="number" step="1" value="6" /></div>\
-        <div>투명도 <input class="series-alpha" type="range" min="0" max="1" step="0.1" value="1" /></div>\
+        <div>선스타일 <select class="series-linestyle" class="border p-1 rounded"><option value="solid">실선</option><option value="dash">파선</option><option value="dot">점선</option></select></div>\
         <div><label><input class="series-showline" type="checkbox" checked/> 선</label> <label class="ml-2"><input class="series-showmarker" type="checkbox" checked/> 표식</label></div>\
       </div>`;
     container.appendChild(div);
   });
 }
 
-// High-res download
-downloadHiRes.addEventListener('click', ()=>{
-  const gd = previewArea.querySelector('.js-plotly-plot');
-  if (!gd) return alert('먼저 차트를 생성하세요');
-  const scale = prompt('배율 입력 (예: 2 = 2x 고해상도)', '2');
-  const s = Math.max(1, Number(scale)||2);
-  Plotly.downloadImage(gd, {format:'png', width:1600*s, height:900*s, scale: s});
-});
+// Y축 라벨 UI 업데이트
+function updateYAxisLabelUI(yfields){
+  const container = document.getElementById('ylabels-container');
+  container.innerHTML = '';
+  yfields.forEach((field, idx)=>{
+    const div = document.createElement('div');
+    div.className = 'mb-2';
+    div.innerHTML = `
+      <label class="block text-sm">Y축${idx+1} 제목 (${field})</label>
+      <input id="ylabel_${idx}" class="border p-1 rounded w-full mb-1 text-sm" placeholder="제목 입력" />
+    `;
+    container.appendChild(div);
+  });
+}
+
+// High-res download (removed as requested)
 
 // 설정 반영 버튼
 btnUpdate.addEventListener('click', ()=>{ btnPlot.click(); });
