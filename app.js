@@ -154,34 +154,35 @@ btnPlot.addEventListener('click', async ()=>{
   if (!yAxisMain && !yAxisSub) return alert('Y축을 최소 1개 선택하세요');
   if (displayFields.length === 0) return alert('표시할 값을 최소 1개 선택하세요');
   
-  // Use main axes for grouping/pivot (only main X axis used for grouping)
-  // displayFields are aggregated (not yAxisMain/yAxisSub)
-  const x_fields = xAxisMain ? [xAxisMain] : [];
+  // Collect all X axes and Y axes
+  const x_axes = [];
+  if (xAxisMain) x_axes.push(xAxisMain);
+  if (xAxisSub) x_axes.push(xAxisSub);
+  const y_axes = [];
+  if (yAxisMain) y_axes.push(yAxisMain);
+  if (yAxisSub) y_axes.push(yAxisSub);
+  
   selectedYFields = displayFields; // store for label UI
   const chartType = document.getElementById('chartType').value;
 
-  // pivot/groupby using X axis main only, aggregate displayFields
-  let plot_df = workbookData;
-  if (x_fields.length && displayFields.length){
-    plot_df = pivotAndAggregate(workbookData, x_fields, displayFields);
-  }
+  // Create pivot datasets: one for each displayField, using corresponding X axis
+  const plot_dfs = [];
+  displayFields.forEach((col, idx) => {
+    const xAxisForThisField = x_axes[Math.min(idx, x_axes.length - 1)];
+    const aggregated = pivotAndAggregate(workbookData, [xAxisForThisField], [col]);
+    plot_dfs.push({ axis: xAxisForThisField, data: aggregated });
+  });
 
   // Update Y-axis and X-axis label UI based on actual axis selections
-  const axis_labels = [];
-  if (yAxisMain) axis_labels.push(yAxisMain);
-  if (yAxisSub) axis_labels.push(yAxisSub);
-  updateYAxisLabelUI(axis_labels);
-  const x_axis_labels = [];
-  if (xAxisMain) x_axis_labels.push(xAxisMain);
-  if (xAxisSub) x_axis_labels.push(xAxisSub);
-  updateXAxisLabelUI(x_axis_labels);
+  updateYAxisLabelUI(y_axes);
+  updateXAxisLabelUI(x_axes);
 
   // build traces
   const traces = [];
   const layout = {
     title: {text: document.getElementById('titleInput').value || '', font:{size:14, family:'Arial, sans-serif', color:'#000'}},
-    xaxis:{title: {text: document.getElementById('xlabel_0')?.value || (x_fields[0]||''), font:{size:12, color:'#000'}}, showgrid:false, zeroline:false, showline:true, linewidth:1.5, linecolor:'#000', mirror:true},
-    yaxis:{title: {text: document.getElementById('ylabel_0')?.value || document.getElementById('ylabelInput').value || (yAxisMain||''), font:{size:12, color:'#000'}}, showgrid:false, zeroline:false, showline:true, linewidth:1.5, linecolor:'#000', mirror:true},
+    xaxis:{title: {text: document.getElementById('xlabel_0')?.value || (x_axes[0]||''), font:{size:12, color:'#000'}}, showgrid:false, zeroline:false, showline:true, linewidth:1.5, linecolor:'#000', mirror:true},
+    yaxis:{title: {text: document.getElementById('ylabel_0')?.value || document.getElementById('ylabelInput').value || (y_axes[0]||''), font:{size:12, color:'#000'}}, showgrid:false, zeroline:false, showline:true, linewidth:1.5, linecolor:'#000', mirror:true},
     template:'plotly_white',
     font:{family:'Arial, sans-serif', size:11, color:'#000'},
     margin:{l:60, r:40, t:50, b:50},
@@ -190,10 +191,13 @@ btnPlot.addEventListener('click', async ()=>{
 
   const options = collectOptionsFromUI();
 
-  const xvals = x_fields.length ? plot_df.map(r=>r[x_fields[0]]) : plot_df.map((r,i)=>i);
-
   // Only plot selected display fields
   displayFields.forEach((ycol, idx)=>{
+    const plotInfo = plot_dfs[idx] || plot_dfs[0];
+    const plot_df = plotInfo.data;
+    const xAxis = plotInfo.axis;
+    
+    const xvals = plot_df.map(r=>r[xAxis]);
     const yvals = plot_df.map(r=>Number(r[ycol]));
     const color = options.series[ycol]?.color || '#000000'; // Default to black
     const trace = {
@@ -290,14 +294,14 @@ btnPlot.addEventListener('click', async ()=>{
   if (options.axis.yinvert){ layout.yaxis.autorange='reversed'; }
 
   // X axis 2 title (if second X selected)
-  if (xAxisSub){
-    const x2label = document.getElementById('xlabel_1')?.value || xAxisSub || '';
+  if (x_axes.length > 1){
+    const x2label = document.getElementById('xlabel_1')?.value || x_axes[1] || '';
     layout.xaxis2 = {overlaying: 'x', side: 'top', title: {text: x2label, font:{size:12, color:'#000'}}, showgrid:false, zeroline:false, showline:true, linewidth:1.5, linecolor:'#000', mirror:true};
   }
 
   // Y axis 2 title (if second Y selected)
-  if (yAxisSub){
-    const y2label = document.getElementById('ylabel_1')?.value || yAxisSub || '';
+  if (y_axes.length > 1){
+    const y2label = document.getElementById('ylabel_1')?.value || y_axes[1] || '';
     layout.yaxis2 = {overlaying: 'y', side: 'right', title: {text: y2label, font:{size:12, color:'#000'}}, showgrid:false, zeroline:false, showline:true, linewidth:1.5, linecolor:'#000', mirror:true};
   }
 
