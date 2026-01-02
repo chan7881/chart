@@ -1,4 +1,4 @@
-// app.js: 기존 로직 유지 + Grid Line 버그 수정 (showgrid & zeroline 제어)
+// app.js: 보조축 Zeroline 제어 추가 (격자 잔상 해결)
 
 const fileInput = document.getElementById('fileInput');
 const btnLoad = document.getElementById('btnLoad');
@@ -16,44 +16,33 @@ let workbookData = null;
 let columns = [];
 let isSwapped = false; 
 
-// 탭 전환 로직
+// 탭 전환
 function toggleTab(toEdit) {
   if(toEdit) {
     panelUpload.classList.add('hidden'); panelEdit.classList.remove('hidden');
-    // Active style
-    tabEdit.classList.remove('bg-slate-200', 'text-slate-600');
-    tabEdit.classList.add('bg-blue-600', 'text-white');
-    // Inactive style
-    tabUpload.classList.remove('bg-blue-600', 'text-white');
-    tabUpload.classList.add('bg-slate-200', 'text-slate-600');
+    tabEdit.classList.replace('bg-slate-200', 'bg-blue-600'); tabEdit.classList.add('text-white');
+    tabUpload.classList.replace('bg-blue-600', 'bg-slate-200'); tabUpload.classList.remove('text-white');
   } else {
     panelUpload.classList.remove('hidden'); panelEdit.classList.add('hidden');
-    // Active style
-    tabUpload.classList.remove('bg-slate-200', 'text-slate-600');
-    tabUpload.classList.add('bg-blue-600', 'text-white');
-    // Inactive style
-    tabEdit.classList.remove('bg-blue-600', 'text-white');
-    tabEdit.classList.add('bg-slate-200', 'text-slate-600');
+    tabUpload.classList.replace('bg-slate-200', 'bg-blue-600'); tabUpload.classList.add('text-white');
+    tabEdit.classList.replace('bg-blue-600', 'bg-slate-200'); tabEdit.classList.remove('text-white');
   }
 }
 tabUpload.addEventListener('click', () => toggleTab(false));
 tabEdit.addEventListener('click', () => toggleTab(true));
 
-// 축 교차 전환
+// 축 교차
 btnSwap.addEventListener('click', () => {
   isSwapped = !isSwapped;
   const swapText = document.getElementById('swapText');
   
   if (isSwapped) {
-    btnSwap.classList.remove('bg-slate-800');
-    btnSwap.classList.add('bg-blue-600');
+    btnSwap.classList.replace('bg-slate-800', 'bg-blue-600');
     swapText.textContent = "축 교차 전환 (Swap X-Y) On";
   } else {
-    btnSwap.classList.remove('bg-blue-600');
-    btnSwap.classList.add('bg-slate-800');
+    btnSwap.classList.replace('bg-blue-600', 'bg-slate-800');
     swapText.textContent = "축 교차 전환 (Swap X-Y) Off";
   }
-  
   if (workbookData) btnPlot.click();
 });
 
@@ -68,10 +57,9 @@ btnLoad.addEventListener('click', () => {
     workbookData = XLSX.utils.sheet_to_json(ws, { defval: null });
     
     if(!workbookData || workbookData.length === 0) return alert('데이터가 없습니다.');
-
     columns = Object.keys(workbookData[0]);
     renderColumnControls();
-    alert('데이터 로드 완료. 탭 하단에서 계열을 선택하세요.');
+    alert('데이터 로드 완료');
   };
   reader.readAsArrayBuffer(fileInput.files[0]);
 });
@@ -87,10 +75,8 @@ function renderColumnControls() {
   columns.forEach(c => {
     const div = document.createElement('div');
     div.className = 'flex items-center gap-2 bg-white p-2 rounded shadow-sm border';
-    div.innerHTML = `
-      <input type="checkbox" name="displayField" value="${c}" id="chk_${c}" class="w-4 h-4 cursor-pointer" />
-      <label for="chk_${c}" class="text-xs truncate cursor-pointer font-bold text-slate-700 flex-1">${c}</label>
-    `;
+    div.innerHTML = `<input type="checkbox" name="displayField" value="${c}" id="chk_${c}" class="w-4 h-4 cursor-pointer" />
+                     <label for="chk_${c}" class="text-xs truncate cursor-pointer font-bold text-slate-700 flex-1">${c}</label>`;
     columnsArea.appendChild(div);
   });
   
@@ -108,7 +94,7 @@ btnPlot.addEventListener('click', () => {
   const yAxisSub = document.getElementById('yAxisSub').value;
   const displayFields = Array.from(document.querySelectorAll('input[name="displayField"]:checked')).map(i => i.value);
 
-  if (!xAxisMain || displayFields.length === 0) return alert('Main X축과 최소 하나의 계열을 선택하세요.');
+  if (!xAxisMain || displayFields.length === 0) return alert('Main X축과 계열을 선택하세요.');
 
   const options = collectOptionsFromUI();
   updateLabelsUI(xAxisMain, xAxisSub, yAxisMain, yAxisSub, displayFields);
@@ -126,15 +112,12 @@ btnPlot.addEventListener('click', () => {
     let finalX = mapped.map(d => d.x);
     let finalY = mapped.map(d => Number(d.y));
 
-    if (isSwapped) {
-      [finalX, finalY] = [finalY, finalX];
-    }
+    if (isSwapped) { [finalX, finalY] = [finalY, finalX]; }
 
     const sOpt = options.series[ycol] || getDefaultSeriesStyle(ycol);
     
     const trace = {
-      x: finalX, 
-      y: finalY, 
+      x: finalX, y: finalY, 
       name: sOpt.display_name,
       mode: (sOpt.show_line ? 'lines' : '') + (sOpt.show_marker ? '+markers' : ''),
       line: { color: sOpt.color, width: sOpt.linewidth, dash: sOpt.linestyle },
@@ -165,16 +148,15 @@ btnPlot.addEventListener('click', () => {
     showlegend: document.getElementById('legendShow').checked,
     legend: { 
       x: options.legend.pos.includes('left') ? 0.02 : 0.98, 
-      y: 0.98,
-      xanchor: options.legend.pos.includes('left') ? 'left' : 'right',
-      yanchor: 'top',
+      y: 0.98, xanchor: options.legend.pos.includes('left') ? 'left' : 'right', yanchor: 'top',
       bordercolor: '#ccc', borderwidth: 1 
     },
+    // 주축 (Main Axis)
     xaxis: { 
       title: { text: isSwapped ? labYM : labXM, font: { weight: 'bold' } },
       showline: true, mirror: true, linewidth: 2, linecolor: '#333', 
       
-      // [GRID FIX] zeroline도 함께 제어해야 완벽하게 사라짐
+      // [FIX] 주축의 showgrid와 zeroline 모두 옵션과 연동
       showgrid: options.grid.enabled, 
       zeroline: options.grid.enabled, 
       gridcolor: options.grid.color,
@@ -185,22 +167,39 @@ btnPlot.addEventListener('click', () => {
       title: { text: isSwapped ? labXM : labYM, font: { weight: 'bold' } },
       showline: true, mirror: true, linewidth: 2, linecolor: '#333', 
       
-      // [GRID FIX] zeroline도 함께 제어해야 완벽하게 사라짐
+      // [FIX] 주축의 showgrid와 zeroline 모두 옵션과 연동
       showgrid: options.grid.enabled, 
       zeroline: options.grid.enabled, 
       gridcolor: options.grid.color,
-
+      
       autorange: options.axis.yinvert ? 'reversed' : true
     }
   };
 
-  // 보조축 설정에도 동일하게 적용
+  // 보조축 (Sub Axis) 설정 - zeroline: false 필수 적용
   if (!isSwapped) {
-    if (yAxisSub) layout.yaxis2 = { title: { text: labYS, font: { weight: 'bold' } }, overlaying: 'y', side: 'right', showline: true, linecolor: '#333', linewidth: 2, showgrid: false };
-    if (xAxisSub) layout.xaxis2 = { title: { text: labXS, font: { weight: 'bold' } }, overlaying: 'x', side: 'top', showline: true, linecolor: '#333', linewidth: 2, showgrid: false };
+    if (yAxisSub) layout.yaxis2 = { 
+        title: { text: labYS, font: { weight: 'bold' } }, overlaying: 'y', side: 'right', 
+        showline: true, linecolor: '#333', linewidth: 2, 
+        showgrid: false, zeroline: false // [FIX] 보조축의 zeroline 강제 비활성화
+    };
+    if (xAxisSub) layout.xaxis2 = { 
+        title: { text: labXS, font: { weight: 'bold' } }, overlaying: 'x', side: 'top', 
+        showline: true, linecolor: '#333', linewidth: 2, 
+        showgrid: false, zeroline: false // [FIX] 보조축의 zeroline 강제 비활성화
+    };
   } else {
-    if (yAxisSub) layout.xaxis2 = { title: { text: labYS, font: { weight: 'bold' } }, overlaying: 'x', side: 'top', showline: true, linecolor: '#333', linewidth: 2, showgrid: false };
-    if (xAxisSub) layout.yaxis2 = { title: { text: labXS, font: { weight: 'bold' } }, overlaying: 'y', side: 'right', showline: true, linecolor: '#333', linewidth: 2, showgrid: false };
+    // Swap 모드에서도 동일 적용
+    if (yAxisSub) layout.xaxis2 = { 
+        title: { text: labYS, font: { weight: 'bold' } }, overlaying: 'x', side: 'top', 
+        showline: true, linecolor: '#333', linewidth: 2, 
+        showgrid: false, zeroline: false 
+    };
+    if (xAxisSub) layout.yaxis2 = { 
+        title: { text: labXS, font: { weight: 'bold' } }, overlaying: 'y', side: 'right', 
+        showline: true, linecolor: '#333', linewidth: 2, 
+        showgrid: false, zeroline: false 
+    };
   }
 
   const w = document.getElementById('chartWidth').value;
@@ -241,7 +240,6 @@ function getDefaultSeriesStyle(name) {
 function renderSeriesControls() {
   const container = document.getElementById('seriesControls');
   const checked = Array.from(document.querySelectorAll('input[name="displayField"]:checked'));
-  
   const backup = {};
   document.querySelectorAll('.series-control').forEach(sc => {
     backup[sc.dataset.name] = {
@@ -263,20 +261,11 @@ function renderSeriesControls() {
   checked.forEach((cb, i) => {
     const name = cb.value;
     const old = backup[name] || {
-      display_name: name,
-      color: colors[i % colors.length],
-      linewidth: 2,
-      markersize: 8,
-      marker: symbols[i % symbols.length],
-      linestyle: 'solid',
-      show_line: true,
-      show_marker: true
+      display_name: name, color: colors[i % colors.length], linewidth: 2, markersize: 8, marker: symbols[i % symbols.length], linestyle: 'solid', show_line: true, show_marker: true
     };
-    
     const div = document.createElement('div');
     div.className = 'series-control p-3 border rounded-lg bg-slate-50 text-xs shadow-sm';
     div.dataset.name = name;
-    
     div.innerHTML = `
       <div class="mb-2 border-b pb-2">
          <div class="flex justify-between items-center mb-1">
@@ -296,7 +285,6 @@ function renderSeriesControls() {
            <select class="series-linestyle border ml-auto rounded"><option value="solid">Solid</option><option value="dash">Dash</option></select>
         </div>
       </div>`;
-    
     div.querySelector('.series-marker').value = old.marker;
     div.querySelector('.series-linestyle').value = old.linestyle;
     container.appendChild(div);
@@ -307,26 +295,17 @@ function updateLabelsUI(xMain, xSub, yMain, ySub, yFields) {
   const xCon = document.getElementById('xlabels-container');
   const yCon = document.getElementById('ylabels-container');
   
-  const existXM = document.getElementById('xlabel_main');
-  const existXS = document.getElementById('xlabel_sub');
-  const existYM = document.getElementById('ylabel_main');
-  const existYS = document.getElementById('ylabel_sub');
+  const curXM = document.getElementById('xlabel_main')?.value;
+  const curXS = document.getElementById('xlabel_sub')?.value;
+  const curYM = document.getElementById('ylabel_main')?.value;
+  const curYS = document.getElementById('ylabel_sub')?.value;
 
-  const valXM = existXM ? existXM.value : xMain;
-  const valXS = existXS ? existXS.value : (xSub || '');
-  const valYM = existYM ? existYM.value : (yMain || yFields[0]);
-  const valYS = existYS ? existYS.value : (ySub || '');
-
-  let xHtml = `<input id="xlabel_main" class="border p-2 rounded w-full text-xs" value="${valXM}" placeholder="Main X Label" />`;
-  if(xSub) {
-    xHtml += `<input id="xlabel_sub" class="border p-2 rounded w-full text-xs mt-2" value="${valXS}" placeholder="Sub X Label" />`;
-  }
+  let xHtml = `<input id="xlabel_main" class="border p-2 rounded w-full text-xs" value="${curXM !== undefined ? curXM : xMain}" placeholder="Main X" />`;
+  if(xSub) xHtml += `<input id="xlabel_sub" class="border p-2 rounded w-full text-xs mt-2" value="${curXS !== undefined ? curXS : xSub}" placeholder="Sub X" />`;
   xCon.innerHTML = xHtml;
 
-  let yHtml = `<input id="ylabel_main" class="border p-2 rounded w-full text-xs" value="${valYM}" placeholder="Main Y Label" />`;
-  if(ySub) {
-    yHtml += `<input id="ylabel_sub" class="border p-2 rounded w-full text-xs mt-2" value="${valYS}" placeholder="Sub Y Label" />`;
-  }
+  let yHtml = `<input id="ylabel_main" class="border p-2 rounded w-full text-xs" value="${curYM !== undefined ? curYM : (yMain || yFields[0])}" placeholder="Main Y" />`;
+  if(ySub) yHtml += `<input id="ylabel_sub" class="border p-2 rounded w-full text-xs mt-2" value="${curYS !== undefined ? curYS : ySub}" placeholder="Sub Y" />`;
   yCon.innerHTML = yHtml;
 }
 
