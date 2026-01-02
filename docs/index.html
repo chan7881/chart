@@ -21,7 +21,7 @@
         <p class="text-slate-500 mt-1 font-medium">논문 규격의 엑셀 파일(.xlsx) 기반 그래프 생성</p>
       </div>
       <button id="btnSwapAxis" class="flex items-center gap-2 px-5 py-2.5 bg-slate-800 text-white rounded-full text-sm font-bold hover:bg-blue-600 transition shadow-lg">
-        <span id="swapIcon">🔄</span> <span id="swapText">축 교차 전환 (Swap X-Y) Off</span>
+        <span id="swapText">축 교차 전환 (Swap X-Y) Off</span>
       </button>
     </header>
 
@@ -40,14 +40,14 @@
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="card border-t-4 border-t-blue-500">
-          <h3 class="font-bold text-sm text-blue-800 mb-4 uppercase tracking-tighter italic">X축 설정(X-Axis Configuration)</h3>
+          <h3 class="font-bold text-sm text-blue-800 mb-4 uppercase tracking-tighter italic">X축 설정(Independent Variable)</h3>
           <div class="space-y-4">
             <div><label class="text-[11px] font-bold text-slate-400">Main X-Axis</label><select id="xAxisMain" class="w-full border p-2 rounded bg-slate-50 text-sm"></select></div>
             <div><label class="text-[11px] font-bold text-slate-400">Sub X-Axis (Optional)</label><select id="xAxisSub" class="w-full border p-2 rounded bg-slate-50 text-sm"></select></div>
           </div>
         </div>
         <div class="card border-t-4 border-t-emerald-500">
-          <h3 class="font-bold text-sm text-emerald-800 mb-4 uppercase tracking-tighter italic">Y축 설정(Y-Axis Configuration)</h3>
+          <h3 class="font-bold text-sm text-emerald-800 mb-4 uppercase tracking-tighter italic">Y축 설정(Dependent Variable)</h3>
           <div class="space-y-4">
             <div><label class="text-[11px] font-bold text-slate-400">Main Y-Axis</label><select id="yAxisMain" class="w-full border p-2 rounded bg-slate-50 text-sm"></select></div>
             <div><label class="text-[11px] font-bold text-slate-400">Secondary Y-Axis (Right)</label><select id="yAxisSub" class="w-full border p-2 rounded bg-slate-50 text-sm"></select></div>
@@ -119,4 +119,5 @@
   <script src="app.js"></script>
 </body>
 </html>
+
 
