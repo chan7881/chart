@@ -1,4 +1,4 @@
-// app.js: 라벨 커스텀 유지 및 축 교차 전환 로직 강화 버전
+// app.js: 라벨 커스텀 유지, 축 교차 전환 강화 및 계열 이름 수정 기능 추가
 
 const fileInput = document.getElementById('fileInput');
 const btnLoad = document.getElementById('btnLoad');
@@ -91,47 +91,40 @@ btnPlot.addEventListener('click', () => {
   updateLabelsUI(xAxisMain, xAxisSub, yAxisMain, yAxisSub, displayFields);
 
   const traces = displayFields.map((ycol, idx) => {
-    // 활성 X축 결정
     const activeX = (xAxisSub && idx > 0) ? xAxisSub : xAxisMain;
     
     let mapped = workbookData.map(row => ({ x: row[activeX], y: row[ycol] }))
                              .filter(d => d.x !== null && d.y !== null);
 
-    // 정렬 (X축 기준)
     if (mapped.length > 0 && !isNaN(mapped[0].x)) mapped.sort((a, b) => Number(a.x) - Number(b.x));
 
     let finalX = mapped.map(d => d.x);
     let finalY = mapped.map(d => Number(d.y));
 
-    // [중요] 축 교차 전환 처리 (데이터 좌표 대칭)
     if (isSwapped) { [finalX, finalY] = [finalY, finalX]; }
 
-    const sOpt = options.series[ycol] || { color: '#000000', linewidth: 2, markersize: 7, show_line: true, show_marker: true };
+    const sOpt = options.series[ycol] || { color: '#000000', linewidth: 2, markersize: 7, show_line: true, show_marker: true, display_name: ycol };
     
     const trace = {
-      x: finalX, y: finalY, name: ycol,
+      x: finalX, y: finalY, 
+      name: sOpt.display_name || ycol, // 사용자 지정 이름을 범례에 반영
       mode: (sOpt.show_line ? 'lines' : '') + (sOpt.show_marker ? '+markers' : ''),
       line: { color: sOpt.color, width: sOpt.linewidth, dash: sOpt.linestyle },
       marker: { color: sOpt.color, size: sOpt.markersize, symbol: sOpt.marker, line: { color: '#000', width: 0.5 } },
       type: document.getElementById('chartType').value
     };
 
-    // 보조축 할당 (Plotly는 xaxis2, yaxis2 형식을 사용)
-    // Swap On일 경우: 기존의 Y가 X로 가고, X가 Y로 가야함.
     if (!isSwapped) {
       if (yAxisSub && ycol === yAxisSub) trace.yaxis = 'y2';
       if (xAxisSub && idx > 0) trace.xaxis = 'x2';
     } else {
-      // Swap 상태에서는 보조 Y축 데이터가 보조 X축이 됨
       if (yAxisSub && ycol === yAxisSub) trace.xaxis = 'x2';
-      // 보조 X축 데이터가 보조 Y축이 됨
       if (xAxisSub && idx > 0) trace.yaxis = 'y2';
     }
 
     return trace;
   });
 
-  // 최종 라벨 결정
   const labXM = document.getElementById('xlabel_main')?.value || xAxisMain;
   const labXS = document.getElementById('xlabel_sub')?.value || xAxisSub;
   const labYM = document.getElementById('ylabel_main')?.value || yAxisMain || displayFields[0];
@@ -144,7 +137,6 @@ btnPlot.addEventListener('click', () => {
     showlegend: document.getElementById('legendShow').checked,
     legend: { x: options.legend.pos.includes('left') ? 0.05 : 0.95, y: 0.95, xanchor: options.legend.pos.includes('left') ? 'left' : 'right', bordercolor: '#000', borderwidth: 1 },
     
-    // 주축 설정
     xaxis: { 
       title: { text: isSwapped ? labYM : labXM, font: { weight: 'bold' } },
       showline: true, mirror: true, linewidth: 2, linecolor: '#000', 
@@ -159,33 +151,19 @@ btnPlot.addEventListener('click', () => {
     }
   };
 
-  // 보조축 설정 (교차 전환 시 축 속성 자체를 스왑)
   if (!isSwapped) {
     if (yAxisSub) {
-      layout.yaxis2 = {
-        title: { text: labYS, font: { weight: 'bold' } },
-        overlaying: 'y', side: 'right', showline: true, linecolor: '#000', linewidth: 2
-      };
+      layout.yaxis2 = { title: { text: labYS, font: { weight: 'bold' } }, overlaying: 'y', side: 'right', showline: true, linecolor: '#000', linewidth: 2 };
     }
     if (xAxisSub) {
-      layout.xaxis2 = {
-        title: { text: labXS, font: { weight: 'bold' } },
-        overlaying: 'x', side: 'top', showline: true, linecolor: '#000', linewidth: 2
-      };
+      layout.xaxis2 = { title: { text: labXS, font: { weight: 'bold' } }, overlaying: 'x', side: 'top', showline: true, linecolor: '#000', linewidth: 2 };
     }
   } else {
-    // Swap On: Y-Sub은 X2가 되고, X-Sub은 Y2가 됨 (선대칭 구현)
     if (yAxisSub) {
-      layout.xaxis2 = {
-        title: { text: labYS, font: { weight: 'bold' } },
-        overlaying: 'x', side: 'top', showline: true, linecolor: '#000', linewidth: 2
-      };
+      layout.xaxis2 = { title: { text: labYS, font: { weight: 'bold' } }, overlaying: 'x', side: 'top', showline: true, linecolor: '#000', linewidth: 2 };
     }
     if (xAxisSub) {
-      layout.yaxis2 = {
-        title: { text: labXS, font: { weight: 'bold' } },
-        overlaying: 'y', side: 'right', showline: true, linecolor: '#000', linewidth: 2
-      };
+      layout.yaxis2 = { title: { text: labXS, font: { weight: 'bold' } }, overlaying: 'y', side: 'right', showline: true, linecolor: '#000', linewidth: 2 };
     }
   }
 
@@ -202,6 +180,7 @@ function collectOptionsFromUI() {
   document.querySelectorAll('.series-control').forEach(sc => {
     const n = sc.dataset.name;
     series[n] = {
+      display_name: sc.querySelector('.series-displayname').value, // 계열 이름 수집
       color: sc.querySelector('.series-color').value,
       linewidth: Number(sc.querySelector('.series-linewidth').value),
       markersize: Number(sc.querySelector('.series-markersize').value),
@@ -222,45 +201,64 @@ function collectOptionsFromUI() {
 function renderSeriesControls() {
   const container = document.getElementById('seriesControls');
   const checked = Array.from(document.querySelectorAll('input[name="displayField"]:checked'));
+  
+  // 기존의 설정값 백업 (이름 등)
+  const existingSettings = {};
+  document.querySelectorAll('.series-control').forEach(sc => {
+    const n = sc.dataset.name;
+    existingSettings[n] = {
+      display_name: sc.querySelector('.series-displayname').value,
+      color: sc.querySelector('.series-color').value,
+      linewidth: sc.querySelector('.series-linewidth').value,
+      markersize: sc.querySelector('.series-markersize').value,
+      marker: sc.querySelector('.series-marker').value,
+      linestyle: sc.querySelector('.series-linestyle').value,
+      show_line: sc.querySelector('.series-showline').checked,
+      show_marker: sc.querySelector('.series-showmarker').checked
+    };
+  });
+
   container.innerHTML = '';
   const symbols = ['circle', 'square', 'triangle-up', 'diamond', 'cross'];
   checked.forEach((cb, i) => {
     const name = cb.value;
+    const old = existingSettings[name] || {};
+    
     const div = document.createElement('div');
     div.className = 'series-control p-3 border rounded-lg bg-slate-50';
     div.dataset.name = name;
     div.innerHTML = `
-      <div class="font-bold text-[10px] mb-2 border-b text-slate-400 truncate">${name}</div>
+      <div class="mb-2 border-b pb-1">
+        <label class="text-[9px] uppercase font-bold text-slate-400 block">Display Name</label>
+        <input type="text" class="series-displayname w-full border text-xs p-1 font-bold rounded" value="${old.display_name || name}" />
+      </div>
       <div class="grid grid-cols-2 gap-2 text-[10px]">
-        <label>Color <input type="color" class="series-color w-full h-4" value="#000000" /></label>
-        <label>Symbol <select class="series-marker w-full border">${symbols.map(s => `<option value="${s}" ${symbols[i%5]===s?'selected':''}>${s}</option>`).join('')}</select></label>
-        <label>Line <input type="number" class="series-linewidth w-full border" value="2" /></label>
-        <label>Size <input type="number" class="series-markersize w-full border" value="7" /></label>
+        <label>Color <input type="color" class="series-color w-full h-4" value="${old.color || '#000000'}" /></label>
+        <label>Symbol <select class="series-marker w-full border">${symbols.map(s => `<option value="${s}" ${(old.marker || symbols[i%5])===s?'selected':''}>${s}</option>`).join('')}</select></label>
+        <label>Line <input type="number" class="series-linewidth w-full border" value="${old.linewidth || '2'}" /></label>
+        <label>Size <input type="number" class="series-markersize w-full border" value="${old.markersize || '7'}" /></label>
         <div class="col-span-2 flex gap-2 pt-1">
-          <label><input type="checkbox" class="series-showline" checked /> 선</label>
-          <label><input type="checkbox" class="series-showmarker" checked /> 마커</label>
-          <select class="series-linestyle border ml-auto"><option value="solid">Solid</option><option value="dash">Dash</option></select>
+          <label><input type="checkbox" class="series-showline" ${old.show_line !== false ? 'checked' : ''} /> 선</label>
+          <label><input type="checkbox" class="series-showmarker" ${old.show_marker !== false ? 'checked' : ''} /> 마커</label>
+          <select class="series-linestyle border ml-auto">
+            <option value="solid" ${old.linestyle==='solid'?'selected':''}>Solid</option>
+            <option value="dash" ${old.linestyle==='dash'?'selected':''}>Dash</option>
+          </select>
         </div>
       </div>`;
     container.appendChild(div);
   });
 }
 
-/**
- * 라벨 커스텀 기능의 '리셋' 방지를 위한 업데이트 함수
- * 필드가 이미 존재하고 사용자가 값을 입력했다면 그 값을 보존함.
- */
 function updateLabelsUI(xMain, xSub, yMain, ySub, yFields) {
   const xCon = document.getElementById('xlabels-container');
   const yCon = document.getElementById('ylabels-container');
   
-  // 현재 입력되어 있는 값들을 백업
   const curXM = document.getElementById('xlabel_main')?.value;
   const curXS = document.getElementById('xlabel_sub')?.value;
   const curYM = document.getElementById('ylabel_main')?.value;
   const curYS = document.getElementById('ylabel_sub')?.value;
 
-  // X축 컨테이너 구성
   let xHtml = `<label class="text-[10px] font-bold">주 X축 라벨</label>
                <input id="xlabel_main" class="border p-2 rounded w-full text-xs" value="${curXM !== undefined ? curXM : xMain}" />`;
   if(xSub) {
@@ -269,7 +267,6 @@ function updateLabelsUI(xMain, xSub, yMain, ySub, yFields) {
   }
   xCon.innerHTML = xHtml;
 
-  // Y축 컨테이너 구성
   let yHtml = `<label class="text-[10px] font-bold">주 Y축 라벨</label>
                <input id="ylabel_main" class="border p-2 rounded w-full text-xs" value="${curYM !== undefined ? curYM : (yMain || yFields[0])}" />`;
   if(ySub) {
