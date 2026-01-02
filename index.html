@@ -3,14 +3,27 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>논문용 그래프 생성기 | 보조축 완벽 지원</title>
+  <title>논문용 그래프 생성기 | Paper Graph Pro</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Plotly.js -->
   <script src="https://cdn.plot.ly/plotly-2.25.2.min.js"></script>
+  <!-- SheetJS -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- Math.js (추세선 계산용, 가벼운 기능 사용) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.min.js"></script>
+  
   <style>
+    /* 기존 디자인 유지 */
     .card { background: white; border-radius: 0.75rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); border: 1px solid #e5e7eb; padding: 1.25rem; }
     .nav-tab { transition: all 0.2s; cursor: pointer; border-radius: 0.5rem 0.5rem 0 0; }
-    #previewArea { min-height: 450px; background-color: #ffffff; }
+    #previewArea { min-height: 500px; background-color: #ffffff; }
+    
+    /* 세부 설정 토글용 스타일 */
+    details > summary { list-style: none; outline: none; cursor: pointer; transition: color 0.2s; }
+    details > summary::-webkit-details-marker { display: none; }
+    details[open] > summary { color: #2563eb; margin-bottom: 0.5rem; }
+    .input-xs { @apply border rounded p-1 text-xs w-full bg-slate-50 focus:bg-white focus:ring-1 focus:ring-blue-500 outline-none; }
+    .label-xs { @apply text-[10px] font-bold text-slate-500 mb-0.5 block; }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
@@ -18,18 +31,20 @@
     <header class="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
       <div>
         <h1 class="text-3xl font-extrabold text-slate-800 tracking-tight">Paper Graph Pro</h1>
-        <p class="text-slate-500 mt-1 font-medium">보조축 및 교차 전환이 포함된 논문 규격 그래프 생성</p>
+        <p class="text-slate-500 mt-1 font-medium">논문 규격 그래프 생성기 (Advanced)</p>
       </div>
       <button id="btnSwapAxis" class="flex items-center gap-2 px-5 py-2.5 bg-slate-800 text-white rounded-full text-sm font-bold hover:bg-blue-600 transition shadow-lg">
         <span id="swapIcon">🔄</span> <span id="swapText">축 교차 전환 (Swap X-Y) Off</span>
       </button>
     </header>
 
+    <!-- 탭 네비게이션 -->
     <div class="flex space-x-1 border-b border-slate-200 mb-6">
       <button id="tab-upload" class="nav-tab px-6 py-2.5 text-sm font-bold bg-blue-600 text-white">1. 데이터 및 축 설정</button>
       <button id="tab-edit" class="nav-tab px-6 py-2.5 text-sm font-bold bg-slate-200 text-slate-600 hover:bg-slate-300">2. 스타일 정밀 수정</button>
     </div>
 
+    <!-- 1. 데이터 업로드 패널 -->
     <div id="panel-upload" class="space-y-6">
       <div class="card">
         <div class="flex flex-col md:flex-row gap-4 items-center">
@@ -42,15 +57,15 @@
         <div class="card border-t-4 border-t-blue-500">
           <h3 class="font-bold text-sm text-blue-800 mb-4 uppercase tracking-tighter italic">X-Axis Configuration</h3>
           <div class="space-y-4">
-            <div><label class="text-[11px] font-bold text-slate-400">Main X-Axis</label><select id="xAxisMain" class="w-full border p-2 rounded bg-slate-50 text-sm"></select></div>
-            <div><label class="text-[11px] font-bold text-slate-400">Sub X-Axis (Optional)</label><select id="xAxisSub" class="w-full border p-2 rounded bg-slate-50 text-sm"></select></div>
+            <div><label class="label-xs">Main X-Axis</label><select id="xAxisMain" class="input-xs h-8"></select></div>
+            <div><label class="label-xs">Sub X-Axis (Optional)</label><select id="xAxisSub" class="input-xs h-8"></select></div>
           </div>
         </div>
         <div class="card border-t-4 border-t-emerald-500">
           <h3 class="font-bold text-sm text-emerald-800 mb-4 uppercase tracking-tighter italic">Y-Axis Configuration</h3>
           <div class="space-y-4">
-            <div><label class="text-[11px] font-bold text-slate-400">Main Y-Axis</label><select id="yAxisMain" class="w-full border p-2 rounded bg-slate-50 text-sm"></select></div>
-            <div><label class="text-[11px] font-bold text-slate-400">Secondary Y-Axis (Right)</label><select id="yAxisSub" class="w-full border p-2 rounded bg-slate-50 text-sm"></select></div>
+            <div><label class="label-xs">Main Y-Axis</label><select id="yAxisMain" class="input-xs h-8"></select></div>
+            <div><label class="label-xs">Secondary Y-Axis (Right)</label><select id="yAxisSub" class="input-xs h-8"></select></div>
           </div>
         </div>
       </div>
@@ -69,51 +84,155 @@
       </div>
     </div>
 
+    <!-- 2. 스타일 정밀 수정 패널 -->
     <div id="panel-edit" class="hidden space-y-6">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      
+      <!-- 상단: 축 및 그리드 설정 -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        
+        <!-- Axis Settings -->
         <div class="card">
-          <div class="font-bold border-b pb-2 mb-4">라벨 커스텀</div>
+          <div class="font-bold border-b pb-2 mb-3 text-sm flex justify-between items-center">
+            <span>📐 축(Axis) 상세 설정</span>
+          </div>
+          <div class="space-y-3 max-h-80 overflow-y-auto pr-1 custom-scrollbar">
+             <!-- X Axis -->
+             <details open class="group">
+                <summary class="text-xs font-bold text-slate-600 bg-slate-100 p-1.5 rounded flex justify-between">X축 설정 <span class="text-slate-400 text-[10px]">▼</span></summary>
+                <div class="p-2 space-y-2 border-l-2 border-slate-200 ml-1">
+                   <input id="titleInput" placeholder="Main Chart Title" class="input-xs mb-2 font-bold text-center" />
+                   <div id="xlabels-container" class="space-y-1"></div>
+                   <div class="grid grid-cols-2 gap-2">
+                      <div><label class="label-xs">Font Size</label><input type="number" id="xTitleSize" value="14" class="input-xs"></div>
+                      <div><label class="label-xs">Color</label><input type="color" id="xTitleColor" value="#000000" class="h-6 w-full cursor-pointer"></div>
+                   </div>
+                   <div class="grid grid-cols-2 gap-2">
+                      <div><label class="label-xs">Min</label><input type="number" id="xMin" placeholder="Auto" class="input-xs"></div>
+                      <div><label class="label-xs">Max</label><input type="number" id="xMax" placeholder="Auto" class="input-xs"></div>
+                      <div><label class="label-xs">Step (dtick)</label><input type="number" id="xTick" placeholder="Auto" class="input-xs"></div>
+                      <div class="flex items-end gap-2">
+                         <label class="text-[10px] flex items-center"><input type="checkbox" id="xLog" class="mr-1">Log</label>
+                         <label class="text-[10px] flex items-center"><input type="checkbox" id="xInv" class="mr-1">Inv</label>
+                      </div>
+                   </div>
+                </div>
+             </details>
+             <!-- Y Axis -->
+             <details class="group">
+                <summary class="text-xs font-bold text-slate-600 bg-slate-100 p-1.5 rounded flex justify-between">Y축 설정 <span class="text-slate-400 text-[10px]">▼</span></summary>
+                <div class="p-2 space-y-2 border-l-2 border-slate-200 ml-1">
+                   <div id="ylabels-container" class="space-y-1"></div>
+                   <div class="grid grid-cols-2 gap-2">
+                      <div><label class="label-xs">Font Size</label><input type="number" id="yTitleSize" value="14" class="input-xs"></div>
+                      <div><label class="label-xs">Color</label><input type="color" id="yTitleColor" value="#000000" class="h-6 w-full cursor-pointer"></div>
+                   </div>
+                   <div class="grid grid-cols-2 gap-2">
+                      <div><label class="label-xs">Min</label><input type="number" id="yMin" placeholder="Auto" class="input-xs"></div>
+                      <div><label class="label-xs">Max</label><input type="number" id="yMax" placeholder="Auto" class="input-xs"></div>
+                      <div><label class="label-xs">Step (dtick)</label><input type="number" id="yTick" placeholder="Auto" class="input-xs"></div>
+                      <div class="flex items-end gap-2">
+                         <label class="text-[10px] flex items-center"><input type="checkbox" id="yLog" class="mr-1">Log</label>
+                         <label class="text-[10px] flex items-center"><input type="checkbox" id="yInv" class="mr-1">Inv</label>
+                      </div>
+                   </div>
+                </div>
+             </details>
+          </div>
+        </div>
+
+        <!-- Grid & Legend Settings -->
+        <div class="card">
+          <div class="font-bold border-b pb-2 mb-3 text-sm">▦ 눈금선(Grid) & 범례</div>
           <div class="space-y-3">
-            <input id="titleInput" placeholder="Graph Title" class="w-full border p-2 text-sm rounded" />
-            <div id="xlabels-container" class="space-y-2"></div>
-            <div id="ylabels-container" class="space-y-2"></div>
-            <div class="flex gap-4 pt-2 border-t mt-2">
-              <label class="inline-flex items-center text-xs"><input id="xlog" type="checkbox" class="mr-2" /> Log Scale</label>
-              <label class="inline-flex items-center text-xs"><input id="yinvert" type="checkbox" class="mr-2" /> Invert Y</label>
-            </div>
+             <!-- Grid X -->
+             <details class="group">
+                <summary class="text-xs font-bold text-slate-600 p-1 cursor-pointer">가로/세로 눈금선 설정</summary>
+                <div class="grid grid-cols-2 gap-3 p-2 bg-slate-50 rounded text-xs">
+                   <div>
+                      <p class="font-bold mb-1">X Grid (Vertical)</p>
+                      <label class="flex items-center mb-1"><input type="checkbox" id="xGridShow" class="mr-1"> Show</label>
+                      <input type="color" id="xGridColor" value="#E2E8F0" class="w-full h-4 mb-1">
+                      <select id="xGridDash" class="input-xs mb-1"><option value="solid">Solid</option><option value="dot">Dot</option><option value="dash">Dash</option></select>
+                      <input type="number" id="xGridWidth" value="1" class="input-xs" placeholder="Width">
+                   </div>
+                   <div>
+                      <p class="font-bold mb-1">Y Grid (Horizontal)</p>
+                      <label class="flex items-center mb-1"><input type="checkbox" id="yGridShow" checked class="mr-1"> Show</label>
+                      <input type="color" id="yGridColor" value="#E2E8F0" class="w-full h-4 mb-1">
+                      <select id="yGridDash" class="input-xs mb-1"><option value="solid">Solid</option><option value="dot">Dot</option><option value="dash">Dash</option></select>
+                      <input type="number" id="yGridWidth" value="1" class="input-xs" placeholder="Width">
+                   </div>
+                </div>
+             </details>
+
+             <!-- Legend -->
+             <details open class="group">
+                <summary class="text-xs font-bold text-slate-600 p-1 cursor-pointer">범례(Legend) 위치</summary>
+                <div class="p-2 space-y-2 border rounded bg-slate-50">
+                   <label class="flex items-center text-xs font-bold"><input type="checkbox" id="legendShow" checked class="mr-2"> 범례 표시 (Show Legend)</label>
+                   <div class="grid grid-cols-2 gap-2">
+                      <div>
+                        <label class="label-xs">기준 위치</label>
+                        <select id="legendType" class="input-xs">
+                           <option value="inside">Inside (차트 안)</option>
+                           <option value="outside">Outside (차트 밖)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="label-xs">상세 위치</label>
+                        <select id="legendPos" class="input-xs">
+                           <option value="top right">Top-Right</option>
+                           <option value="top left">Top-Left</option>
+                           <option value="bottom right">Bottom-Right</option>
+                           <option value="bottom left">Bottom-Left</option>
+                        </select>
+                      </div>
+                   </div>
+                   <div class="flex items-center gap-2">
+                      <label class="label-xs w-auto mb-0">Orientation:</label>
+                      <select id="legendOrient" class="input-xs w-24"><option value="v">Vertical</option><option value="h">Horizontal</option></select>
+                   </div>
+                </div>
+             </details>
           </div>
         </div>
+
+        <!-- Global Settings -->
         <div class="card">
-          <div class="font-bold border-b pb-2 mb-4">논문 스타일 설정</div>
-          <div class="space-y-4">
-            <div class="flex items-center justify-between">
-              <label class="text-sm font-medium"><input id="gridToggle" type="checkbox" class="mr-2" checked /> Grid Line</label>
-              <input id="gridColor" type="color" value="#f1f1f1" class="h-8 w-12 border rounded" />
-            </div>
-            <div class="flex items-center justify-between border-t pt-2">
-              <label class="text-sm font-medium"><input id="legendShow" type="checkbox" class="mr-2" checked /> Legend</label>
-              <select id="legendPos" class="border text-xs p-1 rounded"><option value="top right">Top-Right</option><option value="top left">Top-Left</option></select>
-            </div>
-          </div>
-        </div>
-        <div class="card md:col-span-2">
-            <div class="font-bold border-b pb-2 mb-4">계열 상세 설정 (Series Formatting)</div>
-            <div id="seriesControls" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
+           <div class="font-bold border-b pb-2 mb-3 text-sm">💾 내보내기 (Export)</div>
+           <div class="flex flex-col gap-4 justify-center h-full pb-6">
+              <div class="flex items-center gap-3">
+                 <span class="text-sm font-bold w-12">Width</span>
+                 <input id="chartWidth" type="number" placeholder="Auto" class="input-xs text-center" />
+                 <span class="text-xs text-slate-400">px</span>
+              </div>
+              <div class="flex items-center gap-3">
+                 <span class="text-sm font-bold w-12">Height</span>
+                 <input id="chartHeight" type="number" value="600" class="input-xs text-center" />
+                 <span class="text-xs text-slate-400">px</span>
+              </div>
+              <button id="btnUpdatePreview" class="w-full py-3 bg-blue-600 text-white rounded-lg font-bold shadow-md hover:bg-blue-500 transition">모든 설정 반영 (Update)</button>
+           </div>
         </div>
       </div>
-      <div class="card bg-slate-800 text-white flex flex-col md:flex-row items-center gap-6">
-        <div class="flex items-center gap-3">
-          <span class="text-sm font-bold">Size:</span>
-          <input id="chartWidth" type="number" placeholder="W" class="w-20 p-2 rounded bg-slate-700 text-white text-sm" />
-          <span class="text-slate-500">×</span>
-          <input id="chartHeight" type="number" placeholder="H" class="w-20 p-2 rounded bg-slate-700 text-white text-sm" />
-        </div>
-        <button id="btnUpdatePreview" class="w-full md:w-auto px-10 py-3 bg-blue-500 text-white rounded-lg font-bold">변경 사항 반영</button>
+
+      <!-- Series Formatting (Full Width) -->
+      <div class="card">
+         <div class="font-bold border-b pb-2 mb-4 text-sm flex justify-between">
+            <span>🎨 계열 상세 설정 (Series Formatting)</span>
+            <span class="text-xs font-normal text-slate-500">* 오차막대, 추세선, 레이블 설정 포함</span>
+         </div>
+         <div id="seriesControls" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <!-- JS로 동적 생성됨 -->
+            <p class="text-slate-400 text-sm italic p-4">데이터를 로드하고 계열을 선택하세요.</p>
+         </div>
       </div>
+
     </div>
 
+    <!-- Preview -->
     <div class="mt-8">
-      <div id="previewArea" class="card min-h-[500px] border-2 border-slate-200"></div>
+      <div id="previewArea" class="card min-h-[500px] border-2 border-slate-200 bg-white"></div>
     </div>
   </div>
   <script src="app.js"></script>
