@@ -1,4 +1,4 @@
-// app.js: 보조축 Zeroline 제어 추가 (격자 잔상 해결)
+// app.js: 범례 위치(Bottom) 지원 및 보조축 Zeroline 버그 수정 포함
 
 const fileInput = document.getElementById('fileInput');
 const btnLoad = document.getElementById('btnLoad');
@@ -146,50 +146,49 @@ btnPlot.addEventListener('click', () => {
     template: 'plotly_white',
     margin: { l: 80, r: 80, t: 80, b: 80 },
     showlegend: document.getElementById('legendShow').checked,
+    
+    // [FIX] 범례 위치 설정 강화 (Top/Bottom, Left/Right 지원)
     legend: { 
       x: options.legend.pos.includes('left') ? 0.02 : 0.98, 
-      y: 0.98, xanchor: options.legend.pos.includes('left') ? 'left' : 'right', yanchor: 'top',
+      y: options.legend.pos.includes('bottom') ? 0.02 : 0.98, 
+      xanchor: options.legend.pos.includes('left') ? 'left' : 'right', 
+      yanchor: options.legend.pos.includes('bottom') ? 'bottom' : 'top',
       bordercolor: '#ccc', borderwidth: 1 
     },
+    
     // 주축 (Main Axis)
     xaxis: { 
       title: { text: isSwapped ? labYM : labXM, font: { weight: 'bold' } },
       showline: true, mirror: true, linewidth: 2, linecolor: '#333', 
-      
-      // [FIX] 주축의 showgrid와 zeroline 모두 옵션과 연동
       showgrid: options.grid.enabled, 
       zeroline: options.grid.enabled, 
       gridcolor: options.grid.color,
-      
       type: (isSwapped ? false : options.axis.xlog) ? 'log' : '-' 
     },
     yaxis: { 
       title: { text: isSwapped ? labXM : labYM, font: { weight: 'bold' } },
       showline: true, mirror: true, linewidth: 2, linecolor: '#333', 
-      
-      // [FIX] 주축의 showgrid와 zeroline 모두 옵션과 연동
       showgrid: options.grid.enabled, 
       zeroline: options.grid.enabled, 
       gridcolor: options.grid.color,
-      
       autorange: options.axis.yinvert ? 'reversed' : true
     }
   };
 
-  // 보조축 (Sub Axis) 설정 - zeroline: false 필수 적용
+  // 보조축 (Sub Axis) 설정 - zeroline: false 유지
   if (!isSwapped) {
     if (yAxisSub) layout.yaxis2 = { 
         title: { text: labYS, font: { weight: 'bold' } }, overlaying: 'y', side: 'right', 
         showline: true, linecolor: '#333', linewidth: 2, 
-        showgrid: false, zeroline: false // [FIX] 보조축의 zeroline 강제 비활성화
+        showgrid: false, zeroline: false 
     };
     if (xAxisSub) layout.xaxis2 = { 
         title: { text: labXS, font: { weight: 'bold' } }, overlaying: 'x', side: 'top', 
         showline: true, linecolor: '#333', linewidth: 2, 
-        showgrid: false, zeroline: false // [FIX] 보조축의 zeroline 강제 비활성화
+        showgrid: false, zeroline: false 
     };
   } else {
-    // Swap 모드에서도 동일 적용
+    // Swap 모드
     if (yAxisSub) layout.xaxis2 = { 
         title: { text: labYS, font: { weight: 'bold' } }, overlaying: 'x', side: 'top', 
         showline: true, linecolor: '#333', linewidth: 2, 
@@ -301,11 +300,15 @@ function updateLabelsUI(xMain, xSub, yMain, ySub, yFields) {
   const curYS = document.getElementById('ylabel_sub')?.value;
 
   let xHtml = `<input id="xlabel_main" class="border p-2 rounded w-full text-xs" value="${curXM !== undefined ? curXM : xMain}" placeholder="Main X" />`;
-  if(xSub) xHtml += `<input id="xlabel_sub" class="border p-2 rounded w-full text-xs mt-2" value="${curXS !== undefined ? curXS : xSub}" placeholder="Sub X" />`;
+  if(xSub) {
+    xHtml += `<input id="xlabel_sub" class="border p-2 rounded w-full text-xs mt-2" value="${curXS !== undefined ? curXS : xSub}" placeholder="Sub X" />`;
+  }
   xCon.innerHTML = xHtml;
 
   let yHtml = `<input id="ylabel_main" class="border p-2 rounded w-full text-xs" value="${curYM !== undefined ? curYM : (yMain || yFields[0])}" placeholder="Main Y" />`;
-  if(ySub) yHtml += `<input id="ylabel_sub" class="border p-2 rounded w-full text-xs mt-2" value="${curYS !== undefined ? curYS : ySub}" placeholder="Sub Y" />`;
+  if(ySub) {
+    yHtml += `<input id="ylabel_sub" class="border p-2 rounded w-full text-xs mt-2" value="${curYS !== undefined ? curYS : ySub}" placeholder="Sub Y" />`;
+  }
   yCon.innerHTML = yHtml;
 }
 
