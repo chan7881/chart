@@ -18,7 +18,7 @@
     <header class="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
       <div>
         <h1 class="text-3xl font-extrabold text-slate-800 tracking-tight">Paper Graph Pro</h1>
-        <p class="text-slate-500 mt-1 font-medium">보조축 및 교차 전환이 포함된 논문 규격 그래프 생성</p>
+        <p class="text-slate-500 mt-1 font-medium">논문 규격의 엑셀 파일(.xlsx) 기반 그래프 생성</p>
       </div>
       <button id="btnSwapAxis" class="flex items-center gap-2 px-5 py-2.5 bg-slate-800 text-white rounded-full text-sm font-bold hover:bg-blue-600 transition shadow-lg">
         <span id="swapIcon">🔄</span> <span id="swapText">축 교차 전환 (Swap X-Y) Off</span>
@@ -27,7 +27,7 @@
 
     <div class="flex space-x-1 border-b border-slate-200 mb-6">
       <button id="tab-upload" class="nav-tab px-6 py-2.5 text-sm font-bold bg-blue-600 text-white">1. 데이터 및 축 설정</button>
-      <button id="tab-edit" class="nav-tab px-6 py-2.5 text-sm font-bold bg-slate-200 text-slate-600 hover:bg-slate-300">2. 스타일 정밀 수정</button>
+      <button id="tab-edit" class="nav-tab px-6 py-2.5 text-sm font-bold bg-slate-200 text-slate-600 hover:bg-slate-300">2. 그래프 서식 수정</button>
     </div>
 
     <div id="panel-upload" class="space-y-6">
@@ -40,14 +40,14 @@
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="card border-t-4 border-t-blue-500">
-          <h3 class="font-bold text-sm text-blue-800 mb-4 uppercase tracking-tighter italic">X-Axis Configuration</h3>
+          <h3 class="font-bold text-sm text-blue-800 mb-4 uppercase tracking-tighter italic">X축 설정(X-Axis Configuration)</h3>
           <div class="space-y-4">
             <div><label class="text-[11px] font-bold text-slate-400">Main X-Axis</label><select id="xAxisMain" class="w-full border p-2 rounded bg-slate-50 text-sm"></select></div>
             <div><label class="text-[11px] font-bold text-slate-400">Sub X-Axis (Optional)</label><select id="xAxisSub" class="w-full border p-2 rounded bg-slate-50 text-sm"></select></div>
           </div>
         </div>
         <div class="card border-t-4 border-t-emerald-500">
-          <h3 class="font-bold text-sm text-emerald-800 mb-4 uppercase tracking-tighter italic">Y-Axis Configuration</h3>
+          <h3 class="font-bold text-sm text-emerald-800 mb-4 uppercase tracking-tighter italic">Y축 설정(Y-Axis Configuration)</h3>
           <div class="space-y-4">
             <div><label class="text-[11px] font-bold text-slate-400">Main Y-Axis</label><select id="yAxisMain" class="w-full border p-2 rounded bg-slate-50 text-sm"></select></div>
             <div><label class="text-[11px] font-bold text-slate-400">Secondary Y-Axis (Right)</label><select id="yAxisSub" class="w-full border p-2 rounded bg-slate-50 text-sm"></select></div>
@@ -56,7 +56,7 @@
       </div>
 
       <div class="card">
-        <h3 class="font-bold text-slate-800 mb-4">📊 데이터 계열 선택</h3>
+        <h3 class="font-bold text-slate-800 mb-4">데이터 계열 선택</h3>
         <div id="columnsArea" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 p-4 border rounded-xl bg-slate-50 max-h-60 overflow-y-auto shadow-inner"></div>
       </div>
 
@@ -119,3 +119,4 @@
   <script src="app.js"></script>
 </body>
 </html>
+
