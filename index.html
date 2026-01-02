@@ -40,14 +40,14 @@
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="card border-t-4 border-t-blue-500">
-          <h3 class="font-bold text-sm text-blue-800 mb-4 uppercase tracking-tighter italic">X축 설정(Independent Variable)</h3>
+          <h3 class="font-bold text-sm text-blue-800 mb-4 uppercase tracking-tighter italic">X축 설정 (Independent Variable)</h3>
           <div class="space-y-4">
             <div><label class="text-[11px] font-bold text-slate-400">Main X-Axis</label><select id="xAxisMain" class="w-full border p-2 rounded bg-slate-50 text-sm"></select></div>
             <div><label class="text-[11px] font-bold text-slate-400">Sub X-Axis (Optional)</label><select id="xAxisSub" class="w-full border p-2 rounded bg-slate-50 text-sm"></select></div>
           </div>
         </div>
         <div class="card border-t-4 border-t-emerald-500">
-          <h3 class="font-bold text-sm text-emerald-800 mb-4 uppercase tracking-tighter italic">Y축 설정(Dependent Variable)</h3>
+          <h3 class="font-bold text-sm text-emerald-800 mb-4 uppercase tracking-tighter italic">Y축 설정 (Dependent Variable)</h3>
           <div class="space-y-4">
             <div><label class="text-[11px] font-bold text-slate-400">Main Y-Axis</label><select id="yAxisMain" class="w-full border p-2 rounded bg-slate-50 text-sm"></select></div>
             <div><label class="text-[11px] font-bold text-slate-400">Secondary Y-Axis (Right)</label><select id="yAxisSub" class="w-full border p-2 rounded bg-slate-50 text-sm"></select></div>
@@ -72,7 +72,7 @@
     <div id="panel-edit" class="hidden space-y-6">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="card">
-          <div class="font-bold border-b pb-2 mb-4">라벨 커스텀</div>
+          <div class="font-bold border-b pb-2 mb-4">차트 제목 및 축 제목 설정 (Label)</div>
           <div class="space-y-3">
             <input id="titleInput" placeholder="Graph Title" class="w-full border p-2 text-sm rounded" />
             <div id="xlabels-container" class="space-y-2"></div>
@@ -84,15 +84,15 @@
           </div>
         </div>
         <div class="card">
-          <div class="font-bold border-b pb-2 mb-4">논문 스타일 설정</div>
+          <div class="font-bold border-b pb-2 mb-4">눈금선 및 범례 설정</div>
           <div class="space-y-4">
             <div class="flex items-center justify-between">
-              <label class="text-sm font-medium"><input id="gridToggle" type="checkbox" class="mr-2" checked /> Grid Line (격자 표시)</label>
+              <label class="text-sm font-medium"><input id="gridToggle" type="checkbox" class="mr-2" checked /> 눈금선 설정 (Grid Line)</label>
               <input id="gridColor" type="color" value="#f1f1f1" class="h-8 w-12 border rounded" />
             </div>
             <div class="flex items-center justify-between border-t pt-2">
-              <label class="text-sm font-medium"><input id="legendShow" type="checkbox" class="mr-2" checked /> Legend</label>
-              <select id="legendPos" class="border text-xs p-1 rounded"><option value="top right">Top-Right</option><option value="top left">Top-Left</option></select>
+              <label class="text-sm font-medium"><input id="legendShow" type="checkbox" class="mr-2" checked /> 범례 설정 (Legend)</label>
+              <select id="legendPos" class="border text-xs p-1 rounded"><option value="top right">Top-Right</option><option value="top left">Top-Left</option><option value="bottom right">Bottom-Right</option><option value="bottom left">Bottom-Left</option></select>
             </div>
           </div>
         </div>
@@ -119,5 +119,6 @@
   <script src="app.js"></script>
 </body>
 </html>
+
 
 
