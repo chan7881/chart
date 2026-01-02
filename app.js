@@ -1,4 +1,4 @@
-// app.js: 보조축 완벽 지원 및 교차 전환 로직 개선
+// app.js: 라벨 커스텀 유지 및 축 교차 전환 로직 강화 버전
 
 const fileInput = document.getElementById('fileInput');
 const btnLoad = document.getElementById('btnLoad');
@@ -31,7 +31,7 @@ function toggleTab(toEdit) {
 tabUpload.addEventListener('click', () => toggleTab(false));
 tabEdit.addEventListener('click', () => toggleTab(true));
 
-// 축 교차 전환 스위치
+// 축 교차 전환 스위치 (X <-> Y)
 btnSwap.addEventListener('click', () => {
   isSwapped = !isSwapped;
   btnSwap.classList.toggle('bg-blue-600', isSwapped);
@@ -75,6 +75,7 @@ function renderColumnControls() {
 
 btnPlot.addEventListener('click', () => {
   if (!workbookData) return alert('데이터가 없습니다.');
+  
   const xAxisMain = document.getElementById('xAxisMain').value;
   const xAxisSub = document.getElementById('xAxisSub').value;
   const yAxisMain = document.getElementById('yAxisMain').value;
@@ -83,11 +84,14 @@ btnPlot.addEventListener('click', () => {
 
   if (!xAxisMain || displayFields.length === 0) return alert('X축과 데이터 계열을 선택하세요.');
 
+  // UI에서 옵션 수집
   const options = collectOptionsFromUI();
+  
+  // 라벨 UI 업데이트 (기존 값 존재 시 유지 로직 포함)
   updateLabelsUI(xAxisMain, xAxisSub, yAxisMain, yAxisSub, displayFields);
 
   const traces = displayFields.map((ycol, idx) => {
-    // 1. 현재 계열에 맞는 X축 결정 (주축 또는 보조축)
+    // 활성 X축 결정
     const activeX = (xAxisSub && idx > 0) ? xAxisSub : xAxisMain;
     
     let mapped = workbookData.map(row => ({ x: row[activeX], y: row[ycol] }))
@@ -99,7 +103,7 @@ btnPlot.addEventListener('click', () => {
     let finalX = mapped.map(d => d.x);
     let finalY = mapped.map(d => Number(d.y));
 
-    // [핵심] 보조축 포함 교차 전환
+    // [중요] 축 교차 전환 처리 (데이터 좌표 대칭)
     if (isSwapped) { [finalX, finalY] = [finalY, finalX]; }
 
     const sOpt = options.series[ycol] || { color: '#000000', linewidth: 2, markersize: 7, show_line: true, show_marker: true };
@@ -112,19 +116,27 @@ btnPlot.addEventListener('click', () => {
       type: document.getElementById('chartType').value
     };
 
-    // 보조 Y축 할당 (교차전환 시에도 트레이스는 해당 축 ID를 유지)
-    if (yAxisSub && ycol === yAxisSub) {
-      trace.yaxis = 'y2';
-    }
-    // 보조 X축 할당
-    if (xAxisSub && idx > 0) {
-      trace.xaxis = 'x2';
+    // 보조축 할당 (Plotly는 xaxis2, yaxis2 형식을 사용)
+    // Swap On일 경우: 기존의 Y가 X로 가고, X가 Y로 가야함.
+    if (!isSwapped) {
+      if (yAxisSub && ycol === yAxisSub) trace.yaxis = 'y2';
+      if (xAxisSub && idx > 0) trace.xaxis = 'x2';
+    } else {
+      // Swap 상태에서는 보조 Y축 데이터가 보조 X축이 됨
+      if (yAxisSub && ycol === yAxisSub) trace.xaxis = 'x2';
+      // 보조 X축 데이터가 보조 Y축이 됨
+      if (xAxisSub && idx > 0) trace.yaxis = 'y2';
     }
 
     return trace;
   });
 
-  // 레이아웃 구성
+  // 최종 라벨 결정
+  const labXM = document.getElementById('xlabel_main')?.value || xAxisMain;
+  const labXS = document.getElementById('xlabel_sub')?.value || xAxisSub;
+  const labYM = document.getElementById('ylabel_main')?.value || yAxisMain || displayFields[0];
+  const labYS = document.getElementById('ylabel_sub')?.value || yAxisSub;
+
   const layout = {
     title: { text: document.getElementById('titleInput').value || '' },
     template: 'plotly_white',
@@ -132,38 +144,49 @@ btnPlot.addEventListener('click', () => {
     showlegend: document.getElementById('legendShow').checked,
     legend: { x: options.legend.pos.includes('left') ? 0.05 : 0.95, y: 0.95, xanchor: options.legend.pos.includes('left') ? 'left' : 'right', bordercolor: '#000', borderwidth: 1 },
     
-    // [핵심] 축 교차 전환 시 라벨 및 설정 스왑
+    // 주축 설정
     xaxis: { 
-      title: { text: isSwapped ? (document.getElementById('ylabel_main')?.value || yAxisMain || displayFields[0]) : (document.getElementById('xlabel_main')?.value || xAxisMain), font: { weight: 'bold' } },
-      showline: true, mirror: true, linewidth: 2, linecolor: '#000', showgrid: options.grid.enabled, gridcolor: options.grid.color,
-      type: options.axis.xlog && !isSwapped ? 'log' : '-'
+      title: { text: isSwapped ? labYM : labXM, font: { weight: 'bold' } },
+      showline: true, mirror: true, linewidth: 2, linecolor: '#000', 
+      showgrid: options.grid.enabled, gridcolor: options.grid.color,
+      type: (isSwapped ? false : options.axis.xlog) ? 'log' : '-' 
     },
     yaxis: { 
-      title: { text: isSwapped ? (document.getElementById('xlabel_main')?.value || xAxisMain) : (document.getElementById('ylabel_main')?.value || yAxisMain || displayFields[0]), font: { weight: 'bold' } },
-      showline: true, mirror: true, linewidth: 2, linecolor: '#000', showgrid: options.grid.enabled, gridcolor: options.grid.color,
+      title: { text: isSwapped ? labXM : labYM, font: { weight: 'bold' } },
+      showline: true, mirror: true, linewidth: 2, linecolor: '#000', 
+      showgrid: options.grid.enabled, gridcolor: options.grid.color,
       autorange: options.axis.yinvert ? 'reversed' : true
     }
   };
 
-  // 보조축 레이아웃 (교차 전환 시 위치 변경)
-  if (yAxisSub) {
-    const y2Label = document.getElementById('ylabel_sub')?.value || yAxisSub;
-    layout.yaxis2 = {
-      title: { text: y2Label },
-      overlaying: isSwapped ? 'x' : 'y', // 교차 전환 시 기준축 변경
-      side: isSwapped ? 'top' : 'right',
-      showline: true, linecolor: '#000', linewidth: 2
-    };
-  }
-  
-  if (xAxisSub) {
-    const x2Label = document.getElementById('xlabel_sub')?.value || xAxisSub;
-    layout.xaxis2 = {
-      title: { text: x2Label },
-      overlaying: isSwapped ? 'y' : 'x',
-      side: isSwapped ? 'right' : 'top',
-      showline: true, linecolor: '#000', linewidth: 2
-    };
+  // 보조축 설정 (교차 전환 시 축 속성 자체를 스왑)
+  if (!isSwapped) {
+    if (yAxisSub) {
+      layout.yaxis2 = {
+        title: { text: labYS, font: { weight: 'bold' } },
+        overlaying: 'y', side: 'right', showline: true, linecolor: '#000', linewidth: 2
+      };
+    }
+    if (xAxisSub) {
+      layout.xaxis2 = {
+        title: { text: labXS, font: { weight: 'bold' } },
+        overlaying: 'x', side: 'top', showline: true, linecolor: '#000', linewidth: 2
+      };
+    }
+  } else {
+    // Swap On: Y-Sub은 X2가 되고, X-Sub은 Y2가 됨 (선대칭 구현)
+    if (yAxisSub) {
+      layout.xaxis2 = {
+        title: { text: labYS, font: { weight: 'bold' } },
+        overlaying: 'x', side: 'top', showline: true, linecolor: '#000', linewidth: 2
+      };
+    }
+    if (xAxisSub) {
+      layout.yaxis2 = {
+        title: { text: labXS, font: { weight: 'bold' } },
+        overlaying: 'y', side: 'right', showline: true, linecolor: '#000', linewidth: 2
+      };
+    }
   }
 
   const width = document.getElementById('chartWidth').value;
@@ -171,7 +194,7 @@ btnPlot.addEventListener('click', () => {
   if(width) layout.width = width;
   layout.height = height;
 
-  Plotly.newPlot('previewArea', traces, layout, { responsive: true, toImageButtonOptions: { format: 'png', scale: 2 } });
+  Plotly.newPlot('previewArea', traces, layout, { responsive: true, toImageButtonOptions: { format: 'png', scale: 3 } });
 });
 
 function collectOptionsFromUI() {
@@ -223,14 +246,37 @@ function renderSeriesControls() {
   });
 }
 
+/**
+ * 라벨 커스텀 기능의 '리셋' 방지를 위한 업데이트 함수
+ * 필드가 이미 존재하고 사용자가 값을 입력했다면 그 값을 보존함.
+ */
 function updateLabelsUI(xMain, xSub, yMain, ySub, yFields) {
   const xCon = document.getElementById('xlabels-container');
   const yCon = document.getElementById('ylabels-container');
-  xCon.innerHTML = `<label class="text-[10px] font-bold">주 X축 라벨</label><input id="xlabel_main" class="border p-2 rounded w-full text-xs" value="${xMain}" />`;
-  if(xSub) xCon.innerHTML += `<label class="text-[10px] font-bold mt-2 block">보조 X축 라벨</label><input id="xlabel_sub" class="border p-2 rounded w-full text-xs" value="${xSub}" />`;
   
-  yCon.innerHTML = `<label class="text-[10px] font-bold">주 Y축 라벨</label><input id="ylabel_main" class="border p-2 rounded w-full text-xs" value="${yMain || yFields[0]}" />`;
-  if(ySub) yCon.innerHTML += `<label class="text-[10px] font-bold mt-2 block">보조 Y축 라벨</label><input id="ylabel_sub" class="border p-2 rounded w-full text-xs" value="${ySub}" />`;
+  // 현재 입력되어 있는 값들을 백업
+  const curXM = document.getElementById('xlabel_main')?.value;
+  const curXS = document.getElementById('xlabel_sub')?.value;
+  const curYM = document.getElementById('ylabel_main')?.value;
+  const curYS = document.getElementById('ylabel_sub')?.value;
+
+  // X축 컨테이너 구성
+  let xHtml = `<label class="text-[10px] font-bold">주 X축 라벨</label>
+               <input id="xlabel_main" class="border p-2 rounded w-full text-xs" value="${curXM !== undefined ? curXM : xMain}" />`;
+  if(xSub) {
+    xHtml += `<label class="text-[10px] font-bold mt-2 block">보조 X축 라벨</label>
+              <input id="xlabel_sub" class="border p-2 rounded w-full text-xs" value="${curXS !== undefined ? curXS : xSub}" />`;
+  }
+  xCon.innerHTML = xHtml;
+
+  // Y축 컨테이너 구성
+  let yHtml = `<label class="text-[10px] font-bold">주 Y축 라벨</label>
+               <input id="ylabel_main" class="border p-2 rounded w-full text-xs" value="${curYM !== undefined ? curYM : (yMain || yFields[0])}" />`;
+  if(ySub) {
+    yHtml += `<label class="text-[10px] font-bold mt-2 block">보조 Y축 라벨</label>
+              <input id="ylabel_sub" class="border p-2 rounded w-full text-xs" value="${curYS !== undefined ? curYS : ySub}" />`;
+  }
+  yCon.innerHTML = yHtml;
 }
 
 btnUpdate.addEventListener('click', () => btnPlot.click());
