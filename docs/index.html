@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title> Paper Graph Pro | 엑셀 그래프 생성기</title>
+  <title>Paper Graph Pro | 논문용 그래프 생성기</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.plot.ly/plotly-2.25.2.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -11,6 +11,9 @@
     .card { background: white; border-radius: 0.75rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); border: 1px solid #e5e7eb; padding: 1.25rem; }
     .nav-tab { transition: all 0.2s; cursor: pointer; border-radius: 0.5rem 0.5rem 0 0; }
     #previewArea { min-height: 450px; background-color: #ffffff; }
+    .axis-opt-group { display: flex; gap: 0.75rem; margin-top: 0.25rem; padding-left: 0.25rem; }
+    .axis-opt-label { font-size: 0.7rem; font-weight: 600; color: #475569; display: flex; align-items: center; cursor: pointer; }
+    .axis-opt-checkbox { margin-right: 0.25rem; width: 0.8rem; height: 0.8rem; }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
@@ -18,19 +21,20 @@
     <header class="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
       <div>
         <h1 class="text-3xl font-extrabold text-slate-800 tracking-tight">Paper Graph Pro</h1>
-        <p class="text-slate-500 mt-1 font-medium"> 엑셀 파일(.xlsx) 기반 그래프 생성</p>
+        <p class="text-slate-500 mt-1 font-medium">보조축 및 교차 전환이 포함된 논문 규격 그래프 생성</p>
       </div>
       <button id="btnSwapAxis" class="flex items-center gap-2 px-5 py-2.5 bg-slate-800 text-white rounded-full text-sm font-bold hover:bg-blue-600 transition shadow-lg">
-        <span id="swapText">축 교차 전환 (Swap X-Y) Off</span>
+        <span id="swapIcon">🔄</span> <span id="swapText">축 교차 전환 (Swap X-Y) Off</span>
       </button>
     </header>
 
     <div class="flex space-x-1 border-b border-slate-200 mb-6">
       <button id="tab-upload" class="nav-tab px-6 py-2.5 text-sm font-bold bg-blue-600 text-white">1. 데이터 및 축 설정</button>
-      <button id="tab-edit" class="nav-tab px-6 py-2.5 text-sm font-bold bg-slate-200 text-slate-600 hover:bg-slate-300">2. 그래프 서식 수정</button>
+      <button id="tab-edit" class="nav-tab px-6 py-2.5 text-sm font-bold bg-slate-200 text-slate-600 hover:bg-slate-300">2. 스타일 정밀 수정</button>
     </div>
 
     <div id="panel-upload" class="space-y-6">
+      <!-- 파일 업로드 -->
       <div class="card">
         <div class="flex flex-col md:flex-row gap-4 items-center">
           <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
@@ -38,25 +42,63 @@
         </div>
       </div>
 
+      <!-- 축 설정 (Log/Invert 옵션 포함) -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <!-- X축 설정 -->
         <div class="card border-t-4 border-t-blue-500">
-          <h3 class="font-bold text-sm text-blue-800 mb-4 uppercase tracking-tighter italic">X축 설정 (Independent Variable)</h3>
-          <div class="space-y-4">
-            <div><label class="text-[11px] font-bold text-slate-400">Main X-Axis</label><select id="xAxisMain" class="w-full border p-2 rounded bg-slate-50 text-sm"></select></div>
-            <div><label class="text-[11px] font-bold text-slate-400">Sub X-Axis (Optional)</label><select id="xAxisSub" class="w-full border p-2 rounded bg-slate-50 text-sm"></select></div>
+          <h3 class="font-bold text-sm text-blue-800 mb-4 uppercase tracking-tighter italic">X-Axis Configuration</h3>
+          <div class="space-y-5">
+            <!-- Main X -->
+            <div class="bg-slate-50 p-2 rounded border border-slate-100">
+              <label class="text-[11px] font-bold text-slate-500 block mb-1">Main X-Axis</label>
+              <select id="xAxisMain" class="w-full border p-2 rounded bg-white text-sm focus:ring-1 focus:ring-blue-500 outline-none"></select>
+              <div class="axis-opt-group">
+                <label class="axis-opt-label"><input type="checkbox" id="xMainLog" class="axis-opt-checkbox" /> Log Scale</label>
+                <label class="axis-opt-label"><input type="checkbox" id="xMainInv" class="axis-opt-checkbox" /> Invert</label>
+              </div>
+            </div>
+            <!-- Sub X -->
+            <div class="bg-slate-50 p-2 rounded border border-slate-100 border-dashed">
+              <label class="text-[11px] font-bold text-slate-400 block mb-1">Sub X-Axis (Optional)</label>
+              <select id="xAxisSub" class="w-full border p-2 rounded bg-white text-sm focus:ring-1 focus:ring-blue-500 outline-none"></select>
+              <div class="axis-opt-group">
+                <label class="axis-opt-label"><input type="checkbox" id="xSubLog" class="axis-opt-checkbox" /> Log Scale</label>
+                <label class="axis-opt-label"><input type="checkbox" id="xSubInv" class="axis-opt-checkbox" /> Invert</label>
+              </div>
+            </div>
           </div>
         </div>
+
+        <!-- Y축 설정 -->
         <div class="card border-t-4 border-t-emerald-500">
-          <h3 class="font-bold text-sm text-emerald-800 mb-4 uppercase tracking-tighter italic">Y축 설정 (Dependent Variable)</h3>
-          <div class="space-y-4">
-            <div><label class="text-[11px] font-bold text-slate-400">Main Y-Axis</label><select id="yAxisMain" class="w-full border p-2 rounded bg-slate-50 text-sm"></select></div>
-            <div><label class="text-[11px] font-bold text-slate-400">Secondary Y-Axis (Right)</label><select id="yAxisSub" class="w-full border p-2 rounded bg-slate-50 text-sm"></select></div>
+          <h3 class="font-bold text-sm text-emerald-800 mb-4 uppercase tracking-tighter italic">Y-Axis Configuration</h3>
+          <div class="space-y-5">
+            <!-- Main Y -->
+            <div class="bg-slate-50 p-2 rounded border border-slate-100">
+              <label class="text-[11px] font-bold text-slate-500 block mb-1">Main Y-Axis</label>
+              <select id="yAxisMain" class="w-full border p-2 rounded bg-white text-sm focus:ring-1 focus:ring-emerald-500 outline-none"></select>
+              <div class="axis-opt-group">
+                <label class="axis-opt-label"><input type="checkbox" id="yMainLog" class="axis-opt-checkbox" /> Log Scale</label>
+                <label class="axis-opt-label"><input type="checkbox" id="yMainInv" class="axis-opt-checkbox" /> Invert</label>
+              </div>
+            </div>
+            <!-- Sub Y -->
+            <div class="bg-slate-50 p-2 rounded border border-slate-100 border-dashed">
+              <label class="text-[11px] font-bold text-slate-400 block mb-1">Secondary Y-Axis (Right)</label>
+              <select id="yAxisSub" class="w-full border p-2 rounded bg-white text-sm focus:ring-1 focus:ring-emerald-500 outline-none"></select>
+              <div class="axis-opt-group">
+                <label class="axis-opt-label"><input type="checkbox" id="ySubLog" class="axis-opt-checkbox" /> Log Scale</label>
+                <label class="axis-opt-label"><input type="checkbox" id="ySubInv" class="axis-opt-checkbox" /> Invert</label>
+              </div>
+            </div>
           </div>
         </div>
+
       </div>
 
       <div class="card">
-        <h3 class="font-bold text-slate-800 mb-4">데이터 계열 선택</h3>
+        <h3 class="font-bold text-slate-800 mb-4">📊 데이터 계열 선택</h3>
         <div id="columnsArea" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 p-4 border rounded-xl bg-slate-50 max-h-60 overflow-y-auto shadow-inner"></div>
       </div>
 
@@ -72,27 +114,29 @@
     <div id="panel-edit" class="hidden space-y-6">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="card">
-          <div class="font-bold border-b pb-2 mb-4">차트 제목 및 축 제목 설정 (Label)</div>
+          <div class="font-bold border-b pb-2 mb-4">라벨 커스텀</div>
           <div class="space-y-3">
             <input id="titleInput" placeholder="Graph Title" class="w-full border p-2 text-sm rounded" />
             <div id="xlabels-container" class="space-y-2"></div>
             <div id="ylabels-container" class="space-y-2"></div>
-            <div class="flex gap-4 pt-2 border-t mt-2">
-              <label class="inline-flex items-center text-xs"><input id="xlog" type="checkbox" class="mr-2" /> Log Scale</label>
-              <label class="inline-flex items-center text-xs"><input id="yinvert" type="checkbox" class="mr-2" /> Invert Y</label>
-            </div>
+            <!-- Log Scale/Invert 옵션 제거됨 (상단 탭으로 이동) -->
           </div>
         </div>
         <div class="card">
-          <div class="font-bold border-b pb-2 mb-4">눈금선 및 범례 설정</div>
+          <div class="font-bold border-b pb-2 mb-4">논문 스타일 설정</div>
           <div class="space-y-4">
             <div class="flex items-center justify-between">
-              <label class="text-sm font-medium"><input id="gridToggle" type="checkbox" class="mr-2" checked /> 눈금선 설정 (Grid Line)</label>
+              <label class="text-sm font-medium"><input id="gridToggle" type="checkbox" class="mr-2" checked /> Grid Line (격자 표시)</label>
               <input id="gridColor" type="color" value="#f1f1f1" class="h-8 w-12 border rounded" />
             </div>
             <div class="flex items-center justify-between border-t pt-2">
-              <label class="text-sm font-medium"><input id="legendShow" type="checkbox" class="mr-2" checked /> 범례 설정 (Legend)</label>
-              <select id="legendPos" class="border text-xs p-1 rounded"><option value="top right">Top-Right</option><option value="top left">Top-Left</option><option value="bottom right">Bottom-Right</option><option value="bottom left">Bottom-Left</option></select>
+              <label class="text-sm font-medium"><input id="legendShow" type="checkbox" class="mr-2" checked /> Legend</label>
+              <select id="legendPos" class="border text-xs p-1 rounded">
+                <option value="top right">Top-Right</option>
+                <option value="top left">Top-Left</option>
+                <option value="bottom right">Bottom-Right</option>
+                <option value="bottom left">Bottom-Left</option>
+              </select>
             </div>
           </div>
         </div>
@@ -119,7 +163,3 @@
   <script src="app.js"></script>
 </body>
 </html>
-
-
-
-
