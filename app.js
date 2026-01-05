@@ -1,4 +1,4 @@
-// app.js: 범례 위치(Bottom) 지원 및 보조축 Zeroline 버그 수정 포함
+// app.js: 축별 독립적인 Log Scale / Invert 옵션 지원 및 Swap 로직 강화
 
 const fileInput = document.getElementById('fileInput');
 const btnLoad = document.getElementById('btnLoad');
@@ -85,9 +85,11 @@ function renderColumnControls() {
   });
 }
 
+// 그래프 생성 및 옵션 적용
 btnPlot.addEventListener('click', () => {
   if (!workbookData) return alert('데이터가 없습니다.');
   
+  // 데이터 컬럼 선택값
   const xAxisMain = document.getElementById('xAxisMain').value;
   const xAxisSub = document.getElementById('xAxisSub').value;
   const yAxisMain = document.getElementById('yAxisMain').value;
@@ -95,6 +97,14 @@ btnPlot.addEventListener('click', () => {
   const displayFields = Array.from(document.querySelectorAll('input[name="displayField"]:checked')).map(i => i.value);
 
   if (!xAxisMain || displayFields.length === 0) return alert('Main X축과 계열을 선택하세요.');
+
+  // [New] 축별 Log/Invert 옵션 수집 (라벨 메뉴가 아닌 축 설정 메뉴에서)
+  const axisOpts = {
+    xMain: { log: document.getElementById('xMainLog').checked, inv: document.getElementById('xMainInv').checked },
+    xSub:  { log: document.getElementById('xSubLog').checked,  inv: document.getElementById('xSubInv').checked },
+    yMain: { log: document.getElementById('yMainLog').checked, inv: document.getElementById('yMainInv').checked },
+    ySub:  { log: document.getElementById('ySubLog').checked,  inv: document.getElementById('ySubInv').checked }
+  };
 
   const options = collectOptionsFromUI();
   updateLabelsUI(xAxisMain, xAxisSub, yAxisMain, yAxisSub, displayFields);
@@ -105,6 +115,7 @@ btnPlot.addEventListener('click', () => {
     let mapped = workbookData.map(row => ({ x: row[activeX], y: row[ycol] }))
                              .filter(d => d.x !== null && d.y !== null);
 
+    // 숫자로 변환 가능하면 정렬
     if (mapped.length > 0 && !isNaN(mapped[0].x)) {
       mapped.sort((a, b) => Number(a.x) - Number(b.x));
     }
@@ -112,6 +123,7 @@ btnPlot.addEventListener('click', () => {
     let finalX = mapped.map(d => d.x);
     let finalY = mapped.map(d => Number(d.y));
 
+    // 데이터 좌표 Swap
     if (isSwapped) { [finalX, finalY] = [finalY, finalX]; }
 
     const sOpt = options.series[ycol] || getDefaultSeriesStyle(ycol);
@@ -125,10 +137,12 @@ btnPlot.addEventListener('click', () => {
       type: document.getElementById('chartType').value
     };
 
+    // 보조축 할당 (Swap 상태 고려)
     if (!isSwapped) {
       if (yAxisSub && ycol === yAxisSub) trace.yaxis = 'y2';
       if (xAxisSub && idx > 0) trace.xaxis = 'x2';
     } else {
+      // Swapped: SubY(Right) -> SubX(Top), SubX(Top) -> SubY(Right)
       if (yAxisSub && ycol === yAxisSub) trace.xaxis = 'x2'; 
       if (xAxisSub && idx > 0) trace.yaxis = 'y2';
     }
@@ -141,13 +155,19 @@ btnPlot.addEventListener('click', () => {
   const labYM = document.getElementById('ylabel_main').value;
   const labYS = document.getElementById('ylabel_sub') ? document.getElementById('ylabel_sub').value : '';
 
+  // [New] 레이아웃 설정 시 시각적 축(Visual Axis)에 논리적 설정(Logical Axis Config) 매핑
+  // Swap 시: Visual X = Logical Y, Visual Y = Logical X
+  const visualXMainConfig = isSwapped ? axisOpts.yMain : axisOpts.xMain;
+  const visualYMainConfig = isSwapped ? axisOpts.xMain : axisOpts.yMain;
+  const visualXSubConfig  = isSwapped ? axisOpts.ySub  : axisOpts.xSub;
+  const visualYSubConfig  = isSwapped ? axisOpts.xSub  : axisOpts.ySub;
+
   const layout = {
     title: { text: document.getElementById('titleInput').value || '' },
     template: 'plotly_white',
     margin: { l: 80, r: 80, t: 80, b: 80 },
     showlegend: document.getElementById('legendShow').checked,
     
-    // [FIX] 범례 위치 설정 강화 (Top/Bottom, Left/Right 지원)
     legend: { 
       x: options.legend.pos.includes('left') ? 0.02 : 0.98, 
       y: options.legend.pos.includes('bottom') ? 0.02 : 0.98, 
@@ -156,48 +176,49 @@ btnPlot.addEventListener('click', () => {
       bordercolor: '#ccc', borderwidth: 1 
     },
     
-    // 주축 (Main Axis)
+    // 시각적 주 X축
     xaxis: { 
       title: { text: isSwapped ? labYM : labXM, font: { weight: 'bold' } },
       showline: true, mirror: true, linewidth: 2, linecolor: '#333', 
-      showgrid: options.grid.enabled, 
-      zeroline: options.grid.enabled, 
-      gridcolor: options.grid.color,
-      type: (isSwapped ? false : options.axis.xlog) ? 'log' : '-' 
+      showgrid: options.grid.enabled, zeroline: options.grid.enabled, gridcolor: options.grid.color,
+      // [FIX] 매핑된 설정 사용
+      type: visualXMainConfig.log ? 'log' : '-',
+      autorange: visualXMainConfig.inv ? 'reversed' : true
     },
+    // 시각적 주 Y축
     yaxis: { 
       title: { text: isSwapped ? labXM : labYM, font: { weight: 'bold' } },
       showline: true, mirror: true, linewidth: 2, linecolor: '#333', 
-      showgrid: options.grid.enabled, 
-      zeroline: options.grid.enabled, 
-      gridcolor: options.grid.color,
-      autorange: options.axis.yinvert ? 'reversed' : true
+      showgrid: options.grid.enabled, zeroline: options.grid.enabled, gridcolor: options.grid.color,
+      // [FIX] 매핑된 설정 사용
+      type: visualYMainConfig.log ? 'log' : '-',
+      autorange: visualYMainConfig.inv ? 'reversed' : true
     }
   };
 
-  // 보조축 (Sub Axis) 설정 - zeroline: false 유지
+  // 보조축 설정
   if (!isSwapped) {
     if (yAxisSub) layout.yaxis2 = { 
         title: { text: labYS, font: { weight: 'bold' } }, overlaying: 'y', side: 'right', 
-        showline: true, linecolor: '#333', linewidth: 2, 
-        showgrid: false, zeroline: false 
+        showline: true, linecolor: '#333', linewidth: 2, showgrid: false, zeroline: false,
+        type: visualYSubConfig.log ? 'log' : '-', autorange: visualYSubConfig.inv ? 'reversed' : true
     };
     if (xAxisSub) layout.xaxis2 = { 
         title: { text: labXS, font: { weight: 'bold' } }, overlaying: 'x', side: 'top', 
-        showline: true, linecolor: '#333', linewidth: 2, 
-        showgrid: false, zeroline: false 
+        showline: true, linecolor: '#333', linewidth: 2, showgrid: false, zeroline: false,
+        type: visualXSubConfig.log ? 'log' : '-', autorange: visualXSubConfig.inv ? 'reversed' : true
     };
   } else {
-    // Swap 모드
+    // Swap 모드: yaxis2는 Visual Right Axis(데이터 소스는 Logical X Sub)
     if (yAxisSub) layout.xaxis2 = { 
         title: { text: labYS, font: { weight: 'bold' } }, overlaying: 'x', side: 'top', 
-        showline: true, linecolor: '#333', linewidth: 2, 
-        showgrid: false, zeroline: false 
+        showline: true, linecolor: '#333', linewidth: 2, showgrid: false, zeroline: false,
+        type: visualXSubConfig.log ? 'log' : '-', autorange: visualXSubConfig.inv ? 'reversed' : true
     };
     if (xAxisSub) layout.yaxis2 = { 
         title: { text: labXS, font: { weight: 'bold' } }, overlaying: 'y', side: 'right', 
-        showline: true, linecolor: '#333', linewidth: 2, 
-        showgrid: false, zeroline: false 
+        showline: true, linecolor: '#333', linewidth: 2, showgrid: false, zeroline: false,
+        type: visualYSubConfig.log ? 'log' : '-', autorange: visualYSubConfig.inv ? 'reversed' : true
     };
   }
 
@@ -225,7 +246,7 @@ function collectOptionsFromUI() {
     };
   });
   return {
-    axis: { xlog: document.getElementById('xlog').checked, yinvert: document.getElementById('yinvert').checked },
+    // 기존 axis 옵션 제거 (이제 직접 수집함)
     grid: { enabled: document.getElementById('gridToggle').checked, color: document.getElementById('gridColor').value },
     legend: { pos: document.getElementById('legendPos').value },
     series: series
